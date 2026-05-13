@@ -7,7 +7,7 @@
 			"path": "../../../programs/Steam/steamapps/common/killingfloor2/Development/Src"
 		},
 		{
-			"path": "../../examples/KF2-CustomTraderInventory-master"
+			"path": "../../vscode/KF2-Configurable-Game-Mode"
 		}
 	],
 	"settings": {

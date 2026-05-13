@@ -1,7 +1,5 @@
 class UIP_WeaponPage extends KFGUI_MultiComponent
-    config(DoshExtWeapons)
-    dependson(Ext_WeaponProperties)
-    DependsOn(Ext_WeaponProperties);
+    config(DoshExtWeapons);
 
 var ExtPlayerController KFPC;
 var ExtPlayerReplicationInfo KFPRI;
@@ -37,21 +35,18 @@ var array<class<KFPerk> > DropdownPerkList;
 function LoadAvailableWeapons()
 {
     local int i;
-    local class<KFWeaponDefinition> WPD;
+    local WeaponInfo WPI;
     local Ext_WeaponProperties WPP;
 
     if (KFPC.WeaponList == None)
         return;
 
-    for (i = 0; i < KFPC.WeaponList.WeapDefs.Length; i++)
+    for (i = 0; i < KFPC.WeaponList.WeapInfos.Length; i++)
     {
-        WPD = KFPC.WeaponList.WeapDefs[i];
-        if (WPD != None)
-        {
-            WPP = new class'Ext_WeaponProperties';
-            WPP.DefInit(WPD);
-            AvailableWeapons.AddItem(WPP);
-        }
+        WPI = KFPC.WeaponList.WeapInfos[i];
+        WPP = new class'Ext_WeaponProperties';
+        WPP.DefInit(WPI.WeaponDef, WPI.Remark);
+        AvailableWeapons.AddItem(WPP);
     }
     `log("LoadAvailableWeapons(): Loaded " @ AvailableWeapons.Length @ " available weapons from WeaponList.");
 }
@@ -279,11 +274,9 @@ function CloseMenu()
     SetTimer(0, false);
     
     // Clear selection state
-    SelectedInventoryIdx = -1;
-    SelectedTraderIdx = -1;
+    // SelectedInventoryIdx = -1;
+    // SelectedTraderIdx = -1;
 }
-
-
 
 function bool CanAfford(Ext_WeaponProperties WPP)
 {
@@ -325,6 +318,10 @@ function Timer()
     // weapon inventory list
     InventoryList.EmptyList();
     OwnedWeapList = LocalPC.InvProperties;
+    if (SelectedInventoryIdx <= 0 || SelectedInventoryIdx >= OwnedWeapList.Length) 
+    {
+        SelectedInventoryIdx = 0;
+    }
         
     for (idx = 0; idx < OwnedWeapList.Length; idx++)
     {
@@ -340,6 +337,11 @@ function Timer()
     // trader weapon list
     SaleList.EmptyList();
     SaleListMap.Length = 0;
+    if (SelectedTraderIdx <= 0 || SelectedTraderIdx >= AvailableWeapons.Length) 
+    {
+        SelectedTraderIdx = 0;
+    }
+
     for (idx = 0; idx < AvailableWeapons.Length; idx++)
     {
         WPP = AvailableWeapons[idx];
@@ -356,7 +358,7 @@ function Timer()
         // Skip if player already owns this weapon
         if (KFPC.FindWeaponProperties(WPC, PropIdx))
         {
-            `log("WeaponPage: Player already owns " @ WPD.default.WeaponClassPath);
+            // `log("WeaponPage: Player already owns " @ WPD.default.WeaponClassPath);
             continue;
         }
         
@@ -456,7 +458,7 @@ private function SellSelectedWeapon(ExtPlayerController EXTPC, ExtHumanPawn EXTP
         return;
 
     // Call server function to sell weapon and add dosh atomically
-    EXTPC.SellWeapon(SelectedInventoryIdx);
+    EXTPC.ServerSellWeapon(SelectedInventoryIdx);
 
     // Clear selection and refresh
     SelectedInventoryIdx = -1;
@@ -482,7 +484,6 @@ function UpdateWeaponIconDisplay()
 
 function UpdateStatsDisplay()
 {
-    local Ext_WeaponProperties WPP;
     local ExtPlayerController LocalPC;
     local ExtPlayerReplicationInfo ExtPri;
 
@@ -493,6 +494,11 @@ function UpdateStatsDisplay()
         return;
     }
 
+    if (LocalPC.InvProperties[SelectedInventoryIdx].bCanBeSold)
+        BuyWeaponButton.SetDisabled(false);
+    else
+        BuyWeaponButton.SetDisabled(true);
+
     ExtPRI = ExtPlayerReplicationInfo(LocalPC.PlayerReplicationInfo);
     if (ExtPRI == None)
     {
@@ -500,8 +506,7 @@ function UpdateStatsDisplay()
         return;
     }
 
-    WPP = LocalPC.InvProperties[SelectedInventoryIdx];
-    RebuildStatRows(WPP);
+    UpdateStatRows(LocalPC.InvProperties[SelectedInventoryIdx]);
 }
 
 private function ClearStatRows()
@@ -516,7 +521,7 @@ private function ClearStatRows()
     WeaponStatsList.ItemComponents.Length = 0;
 }
 
-private function RebuildStatRows(Ext_WeaponProperties WPP)
+private function UpdateStatRows(Ext_WeaponProperties WPP)
 {
     local UIR_WeaponStatRow StatRow;
     local int i;
@@ -634,7 +639,7 @@ private function bool StatRowsMatch(Ext_WeaponProperties WPP)
     return true;
 }
 
-simulated function OnUpgradeDamage(KFGUI_Button Sender)
+simulated function OnUpgradeClicked(KFGUI_Button Sender, UpgradeTypes StatType, bool bMax = false)
 {
     local ExtPlayerController EXTPC;
     local Ext_WeaponProperties WPP;
@@ -671,107 +676,10 @@ simulated function OnUpgradeDamage(KFGUI_Button Sender)
     
     // `log("UIP_WeaponPage.OnUpgradeDamage: Valid weapon found - " @ WPP.WeaponDef.default.WeaponClassPath);
     // `log("UIP_WeaponPage.OnUpgradeDamage: Calling ServerUpgradeWeaponDamage(" @ SelectedInventoryIdx @ ")");
-    EXTPC.ServerUpgradeWeaponDamage(SelectedInventoryIdx);
-}
-
-simulated function OnUpgradeAoE(KFGUI_Button Sender)
-{
-    local ExtPlayerController EXTPC;
-    local Ext_WeaponProperties WPP;
-
-    if (!bIsInventorySelected || SelectedInventoryIdx < 0)
-    {
-        // `log("UIP_WeaponPage.OnUpgradeAoE: Early return - invalid selection state");
-        return;
-    }
-
-    EXTPC = ExtPlayerController(GetPlayer());
-    if (EXTPC == None)
-    {
-        // `log("UIP_WeaponPage.OnUpgradeAoE: Early return - EXTPC is None");
-        return;
-    }
-    
-    if (SelectedInventoryIdx >= EXTPC.InvProperties.Length)
-    {
-        // `log("UIP_WeaponPage.OnUpgradeAoE: ERROR - SelectedInventoryIdx (" @ SelectedInventoryIdx @ ") >= InvProperties.Length (" @ EXTPC.InvProperties.Length @ ")");
-        return;
-    }
-    
-    WPP = EXTPC.InvProperties[SelectedInventoryIdx];
-    if (WPP == None)
-    {
-        // `log("UIP_WeaponPage.OnUpgradeAoE: ERROR - InvProperties[" @ SelectedInventoryIdx @ "] is None");
-        return;
-    }
-    
-    // `log("UIP_WeaponPage.OnUpgradeAoE: Calling ServerUpgradeWeaponAoE(" @ SelectedInventoryIdx @ ")");
-    EXTPC.ServerUpgradeWeaponAoE(SelectedInventoryIdx);
-}
-
-simulated function OnUpgradePenetration(KFGUI_Button Sender)
-{
-    local ExtPlayerController EXTPC;
-    local Ext_WeaponProperties WPP;
-
-    if (!bIsInventorySelected || SelectedInventoryIdx < 0)
-    {
-        // `log("UIP_WeaponPage.OnUpgradePenetration: Early return - invalid selection state");
-        return;
-    }
-
-    EXTPC = ExtPlayerController(GetPlayer());
-    if (EXTPC == None)
-    {
-        // `log("UIP_WeaponPage.OnUpgradePenetration: Early return - EXTPC is None");
-        return;
-    }
-    
-    if (SelectedInventoryIdx >= EXTPC.InvProperties.Length)
-    {
-        // `log("UIP_WeaponPage.OnUpgradePenetration: ERROR - SelectedInventoryIdx (" @ SelectedInventoryIdx @ ") >= InvProperties.Length (" @ EXTPC.InvProperties.Length @ ")");
-        return;
-    }
-    
-    WPP = EXTPC.InvProperties[SelectedInventoryIdx];
-    if (WPP == None)
-    {
-        // `log("UIP_WeaponPage.OnUpgradePenetration: ERROR - InvProperties[" @ SelectedInventoryIdx @ "] is None");
-        return;
-    }
-    
-    // `log("UIP_WeaponPage.OnUpgradePenetration: Calling ServerUpgradeWeaponPenetration(" @ SelectedInventoryIdx @ ")");
-    EXTPC.ServerUpgradeWeaponPenetration(SelectedInventoryIdx);
-}
-
-simulated function OnUpgradeDoT(KFGUI_Button Sender)
-{
-    local ExtPlayerController EXTPC;
-    local Ext_WeaponProperties WPP;
-
-    if (!bIsInventorySelected || SelectedInventoryIdx < 0)
-    {
-        return;
-    }
-
-    EXTPC = ExtPlayerController(GetPlayer());
-    if (EXTPC == None)
-    {
-        return;
-    }
-    
-    if (SelectedInventoryIdx >= EXTPC.InvProperties.Length)
-    {
-        return;
-    }
-    
-    WPP = EXTPC.InvProperties[SelectedInventoryIdx];
-    if (WPP == None)
-    {
-        return;
-    }
-    
-    EXTPC.ServerUpgradeWeaponDoT(SelectedInventoryIdx);
+    if (bMax)
+        EXTPC.ServerUpgradeMax(SelectedInventoryIdx, StatType);
+    else
+        EXTPC.ServerUpgradeWeapon(SelectedInventoryIdx, StatType);
 }
 
 function DrawWeaponIcon(class<KFWeapon> KFW, Canvas C, float X, float Y, float Width, float Height)

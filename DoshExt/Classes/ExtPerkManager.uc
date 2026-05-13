@@ -130,6 +130,7 @@ function ApplyPawnStats()
 
 function ApplyPerk(Ext_PerkBase P)
 {
+	local ExtPlayerController EPC;
 	local KFInventoryManager InvMan;
 	local Ext_T_ZEDHelper H;
 	local int i;
@@ -177,6 +178,11 @@ function ApplyPerk(Ext_PerkBase P)
 	}
 	
 	ApplyPawnStats();
+
+	// reset max weapon upgrade levels
+	EPC = ExtPlayerController(PlayerOwner);
+	if (EPC != None)
+		EPC.SetWeaponMaxLevels();
 
 	// check if weapon upgrades are valid for the current prestige lv
 }
@@ -513,7 +519,7 @@ function bool CanEarnSmallRadiusKillXP(class<DamageType> DT)
 simulated function ModifySpeed(out float Speed)
 {
 	if (CurrentPerk!=None)
-		Speed *= CurrentPerk.Modifiers[0];
+		Speed *= CurrentPerk.Modifiers[ExtStat_Speed];
 }
 
 function ModifyDamageGiven(out int InDamage, optional Actor DamageCauser, optional KFPawn_Monster MyKFPM, optional KFPlayerController DamageInstigator, optional class<KFDamageType> DamageType, optional int HitZoneIdx)

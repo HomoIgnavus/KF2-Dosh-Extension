@@ -45,10 +45,22 @@ var int SpWeaponMax;
 var public float ArmorEfficiency;
 var public float AirBagRate; // for berserker's Ext_TraitAirbagArmor
 
+// special abilities
+var public int AbilityGauge;
+var public int AbilityCount;
+var public int MaxAbilityCount;
+
+var bool bIsUsingMGRs;
+var public int MGRs_BaseDamage;
+var public int MGRs_DamageMod;
+var public int MGRs_BasePenetration;
+var public int MGRs_PenetrationMod;
+var public int MGRs_CurrentAmmo;
+
 replication
 {
 	if (true)
-		bFeigningDeath,RepRegenHP,BackpackWeaponClass,ArmorInt,MaxArmorInt;
+		bFeigningDeath,RepRegenHP,BackpackWeaponClass,ArmorInt,MaxArmorInt,bIsUsingMGRs,AbilityGauge,AbilityCount,MaxAbilityCount;
 	if (bNetOwner)
 		bHasBunnyHop;
 	if (bNetDirty)
@@ -218,21 +230,21 @@ function AdjustDamage(out int InDamage, out vector Momentum, Controller Instigat
 	}
 
 	// parry projectile damage the the pawn can
-	// debug
-	bCanParryProj = true;
 
 	ProjectileCauser = Projectile(DamageCauser);
 	if (bCanParryProj && ProjectileCauser != None) 
 	{
 		`log("ExtHumanPawn.AdjustDamage() DamageType=" @ DamageType);
-		ParryProjectile(ProjectileCauser);
-		InDamage = 0;
-		Momentum.Y = 0;
-		Momentum.Z = 0;
+		if (ParryProjectile(ProjectileCauser))
+		{
+			InDamage = 0;
+			Momentum.Y = 0;
+			Momentum.Z = 0;
+		}
 	}
 }
 
-function ParryProjectile(Projectile DamageCauser)
+function bool ParryProjectile(Projectile ProjCauser)
 {
 	local ExtPerkManager ExtPM;
 	local Ext_PerkBerserker BerserkerPerk;
@@ -243,54 +255,53 @@ function ParryProjectile(Projectile DamageCauser)
 	ExtPM = ExtPerkManager(GetPerk());
 	if (ExtPM == None)
 	{
-		`log("ExtHumanPawn.ParryProjectile() ExtPM == None");
-		return;
+		// `log("ExtHumanPawn.ParryProjectile() ExtPM == None");
+		return false;
 	}
 
 	BerserkerPerk = Ext_PerkBerserker(ExtPM.CurrentPerk);
 	if (BerserkerPerk == None)
 	{
-		`log("ExtHumanPawn.ParryProjectile() BerserkerPerk == None");
-		return;
+		// `log("ExtHumanPawn.ParryProjectile() BerserkerPerk == None");
+		return false;
 	}
 
-	if (DamageCauser != None && Instigator != None)
+	if (BerserkerPerk.bIsParryCoolingDown)
+		return false;
+
+	MeleeWeap = KFWeap_MeleeBase(MyKFWeapon);
+	if (MeleeWeap != None && MeleeWeap.IsInState('MeleeBlocking'))
 	{
-		if (!ClassIsChildOf(DamageCauser.class, class'Projectile'))
+		if (ProjCauser.Instigator != None)
 		{
-			`log("ExtHumanPawn.ParryProjectile() not a projectile!");
-			return;
+			Dir2d = Normal2d(ProjCauser.Instigator.Location - ProjCauser.Location);
 		}
-		MeleeWeap = KFWeap_MeleeBase(MyKFWeapon);
-		if (MeleeWeap != None && MeleeWeap.IsInState('MeleeBlocking'))
+		else
 		{
-			if (DamageCauser.Instigator != None)
-			{
-				Dir2d = Normal2d(DamageCauser.Instigator.Location - DamageCauser.Location);
-			}
-			else
-			{
-				Dir2d = Normal2d(DamageCauser.Location - Location);
-			}
-			FacingDot = vector(Rotation) dot Dir2d;
+			Dir2d = Normal2d(ProjCauser.Location - Location);
+		}
+		FacingDot = vector(Rotation) dot Dir2d;
 
-			if (FacingDot > 0.087f && !IsSameTeam(DamageCauser.Instigator))
+		if (FacingDot > 0.087f && !IsSameTeam(ProjCauser.Instigator))
+		{
+			
+			if (MeleeWeap.IsTimerActive('ParryCheckTimer'))
 			{
+				// `log("ExtHumanPawn.AdjustDamage() blocked projectile!");
 				
-				if (bCanParryProj &&MeleeWeap.IsTimerActive('ParryCheckTimer'))
-				{
-					// `log("ExtHumanPawn.AdjustDamage() blocked projectile!");
-					
-					// ExtPM.SetSuccessfullBlock();
-					// BerserkerPerk.TriggerParryExplosion(DamageCauser.Instigator, false);
-					BerserkerPerk.TriggerTraitParry(DamageCauser.Instigator);
-					
-					if (bCanReflectProj)
-						ReflectProj(DamageCauser);
-				}
+				// ExtPM.SetSuccessfullBlock();
+				// BerserkerPerk.TriggerParryExplosion(DamageCauser.Instigator, false);
+				BerserkerPerk.TriggerTraitParry(ProjCauser.Instigator);
+				
+				if (bCanReflectProj)
+					ReflectProj(ProjCauser);
+
+				return true;
 			}
 		}
 	}
+	
+	return false;
 }
 
 function ReflectProj(Projectile Proj)
@@ -298,8 +309,9 @@ function ReflectProj(Projectile Proj)
 	local Projectile RefProj;
 	local vector ReflectDir;
 	local KFProjectile KFRefProj;
+	local vector SpawnLocation;
 
-	ReflectDir = -vector(Proj.Rotation);
+	ReflectDir = Proj.Instigator.Location - Proj.Location;
 	Proj.Destroy();
 
 	RefProj = Spawn(Proj.class, self, , self.Location, rotator(ReflectDir),, true);
@@ -312,8 +324,9 @@ function ReflectProj(Projectile Proj)
 		KFRefProj = KFProjectile(RefProj);
 		if (KFRefProj != None)
 		{
+			SpawnLocation = self.Location + (ReflectDir * 3.0);
 			// Set OriginalLocation for client-side position sync
-			KFRefProj.OriginalLocation = self.Location;
+			KFRefProj.OriginalLocation = SpawnLocation;
 			
 			// Force synchronization of visual mesh with physical location
 			KFRefProj.SyncOriginalLocation();
@@ -393,11 +406,13 @@ simulated function bool Died(Controller Killer, class<DamageType> damageType, ve
 
 simulated function BroadcastDeathMessage(Controller Killer);
 
+simulated event NotifyOutOfBattery(){ return; }
+
 function SetBatteryRate(float Rate)
 {
-	BatteryDrainRate = Default.BatteryDrainRate*Rate;
-	NVGBatteryDrainRate = Default.NVGBatteryDrainRate*Rate;
-	ClientSetBatteryRate(Rate);
+	BatteryDrainRate = 0.0;
+	NVGBatteryDrainRate = 0.0;
+	ClientSetBatteryRate(0.0);
 }
 
 simulated reliable client function ClientSetBatteryRate(float Rate)
@@ -1065,6 +1080,7 @@ simulated function OnWakeUpFinished();
 
 function AddDefaultInventory()
 {
+	local ExtPlayerController EPC;
 	local KFPerk MyPerk;
 
 	MyPerk = GetPerk();
@@ -1072,6 +1088,16 @@ function AddDefaultInventory()
 		MyPerk.AddDefaultInventory(self);
 
 	Super(KFPawn).AddDefaultInventory();
+
+	EPC = ExtPlayerController(Controller);
+	if (EPC != none)
+	{
+		EPC.ServerRecreateWeaponProperties();
+	}
+	else
+	{
+		`log("ExtHumanAddDefaultInventory: EPC is none, cannot recreate weapon properties");
+	}
 }
 
 simulated event FellOutOfWorld(class<DamageType> dmgType)
@@ -1706,10 +1732,101 @@ simulated function Ext_PerkFieldMedic GetMedicPerk(ExtPlayerController Healer)
 	return None;
 }
 
+reliable client function ClientAbilityUpdated(int NewGauge, int NewCount)
+{
+    AbilityGauge = NewGauge;
+    AbilityCount = NewCount;
+	`log("ClientAbilityUpdated(): AbilityGauge: " @ AbilityGauge @ " AbilityCount: " @ AbilityCount @ " MaxAbilityCount: " @ MaxAbilityCount);
+}
+
+
+function AddAbilityGauge(int AP)
+{
+	AbilityGauge += AP;
+
+	// assuming that AbilityGauge won't be >= 200
+	if (AbilityGauge >= 100)
+	{
+		if (AbilityCount < MaxAbilityCount)
+		{
+			AbilityCount++;
+			AbilityGauge -= 100;
+		}
+		else
+		{
+			AbilityGauge = 99;
+		}
+	}
+	if (Role == ROLE_Authority)
+    {
+        ClientAbilityUpdated(AbilityGauge, AbilityCount);
+    }
+	`log("AddAbilityGauge(): AbilityGauge: " @ AbilityGauge @ " AbilityCount: " @ AbilityCount @ " MaxAbilityCount: " @ MaxAbilityCount);
+}
+
+simulated function StartFire(byte FireModeNum)
+{
+    // 2 is the RELOAD_FIREMODE. 
+    // If we are already using MGRs and a reload is triggered, we reset it.
+    if (FireModeNum == 2 && bIsUsingMGRs)
+    {
+        ResetMGRs();
+    }
+    Super.StartFire(FireModeNum);
+}
+
+function MGRs_Reload()
+{
+	local KFWeapon KFW;
+	local ExtPlayerReplicationInfo KFPRI;
+
+	// if (AbilityCount <= 0) return;
+
+	KFPRI = ExtPlayerReplicationInfo(PlayerReplicationInfo);
+	if (KFPRI == None) return;
+	if (KFPRI.Score < KFW.MagazineCapacity[0]) return;
+
+
+	KFW = KFWeapon(Weapon);
+	if (KFW == None) return;
+	
+	`log("MGRs_Reload() executing");
+	KFW.GotoState('Reloading');
+	KFW.SpareAmmoCount[0] += KFW.AmmoCount[0];
+	KFW.AmmoCount[0] = KFW.MagazineCapacity[0];
+
+	bIsUsingMGRs = true;
+	MGRs_CurrentAmmo = KFW.MagazineCapacity[0];
+	KFPRI.AddDosh(-MGRs_CurrentAmmo);
+	MGRs_BaseDamage = KFW.InstantHitDamage[0];
+	MGRs_BasePenetration = KFW.PenetrationPower[0];
+	KFW.InstantHitDamage[0] *= MGRs_DamageMod;
+	KFW.PenetrationPower[0] *= MGRs_PenetrationMod;
+
+	AbilityCount--;
+}
+
+function ResetMGRs()
+{
+    local KFWeapon KFW;
+    
+    KFW = KFWeapon(Weapon);
+    if (KFW == None) return;
+
+	KFW.InstantHitDamage[0] = MGRs_BaseDamage;
+	KFW.PenetrationPower[0] = MGRs_BasePenetration;
+    
+    bIsUsingMGRs = false;
+    MGRs_CurrentAmmo = 0;
+}
+
 function ThrowActiveWeapon(optional bool bDestroyWeap)
 {
 	local KFWeapon TempWeapon;
 	local ExtPlayerController EPC;
+
+	// disabled since this causes too much trouble in the weapon upgrade system
+	return;
 
 	if( Role < ROLE_Authority )
 	{
@@ -1742,6 +1859,10 @@ defaultproperties
 	HealthRegenRate=0.2
 	ArmorInt=0
 	MaxArmorInt=100
+
+	AbilityCount=0
+	AbilityGauge=0
+	MaxAbilityCount=0
 
 	ArmorEfficiency = 1.0
 	AirBagRate = 0.0

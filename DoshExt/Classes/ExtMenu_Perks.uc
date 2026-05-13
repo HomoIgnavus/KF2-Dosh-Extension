@@ -86,6 +86,7 @@ function Callback_PerkSelected(byte NewPerkIndex, bool bClickedIndex)
 
 	ExtKFPC.PendingPerkClass = ExtPrevPerk.Class;
 	ExtKFPC.SwitchToPerk(ExtPrevPerk.Class);
+
 }
 
 function Callback_SkillSelectionOpened();

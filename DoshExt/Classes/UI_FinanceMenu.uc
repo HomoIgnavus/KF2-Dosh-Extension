@@ -6,9 +6,17 @@ var localized string AbilityButtonText;
 var localized string CloseButtonText;
 var localized string CloseButtonToolTip;
 
+enum DoshMenuButtonIDs
+{
+    DoshMenuWeapon,
+    DoshMenuAbility,
+    DoshMenuBanking,
+    DoshMenuUndefined,
+};
+
 var array<KFGUI_MultiComponent> SubPages;
 var array<KFGUI_Button> TabButtons;
-var int CurrentPageIndex;
+var DoshMenuButtonIDs CurrentPageIndex;
 var int PageComponentIndex;
 
 function InitMenu()
@@ -19,6 +27,27 @@ function InitMenu()
     local UIP_SpAbilPage SpAbilPage;
 
     Super.InitMenu();
+    SubPages.Length = DoshMenuUndefined;
+
+    TraderPage = new (Self) class'UIP_WeaponPage';
+    TraderPage.Owner = Owner;
+    TraderPage.ParentComponent = Self;
+    TraderPage.XPosition = 0.01;
+    TraderPage.YPosition = 0.145;
+    TraderPage.XSize = 0.98;
+    TraderPage.YSize = 0.775;
+    TraderPage.InitMenu();
+    SubPages[DoshMenuWeapon] = TraderPage;
+
+    SpAbilPage = new (Self) class'UIP_SpAbilPage';
+    SpAbilPage.Owner = Owner;
+    SpAbilPage.ParentComponent = Self;
+    SpAbilPage.XPosition = 0.01;
+    SpAbilPage.YPosition = 0.145;
+    SpAbilPage.XSize = 0.98;
+    SpAbilPage.YSize = 0.775;
+    SpAbilPage.InitMenu();
+    SubPages[DoshMenuAbility] = SpAbilPage;
 
     // Create and initialize sub-pages (NOT via AddComponent — avoids double InitMenu)
     BankingPage = new (Self) class'UIP_TransferPage';
@@ -29,49 +58,15 @@ function InitMenu()
     BankingPage.XSize = 0.98;
     BankingPage.YSize = 0.775;
     BankingPage.InitMenu();
-    SubPages.AddItem(BankingPage);
-
-    TraderPage = new (Self) class'UIP_WeaponPage';
-    TraderPage.Owner = Owner;
-    TraderPage.ParentComponent = Self;
-    TraderPage.XPosition = 0.01;
-    TraderPage.YPosition = 0.145;
-    TraderPage.XSize = 0.98;
-    TraderPage.YSize = 0.775;
-    TraderPage.InitMenu();
-    SubPages.AddItem(TraderPage);
-
-    SpAbilPage = new (Self) class'UIP_SpAbilPage';
-    SpAbilPage.Owner = Owner;
-    SpAbilPage.ParentComponent = Self;
-    SpAbilPage.XPosition = 0.01;
-    SpAbilPage.YPosition = 0.145;
-    SpAbilPage.XSize = 0.98;
-    SpAbilPage.YSize = 0.775;
-    SpAbilPage.InitMenu();
-    SubPages.AddItem(SpAbilPage);
-
-    // Banking tab button
-    B = new (Self) class'KFGUI_GreenButton';
-    B.ButtonText = BankingButtonText;
-    B.OnClickLeft = TabClicked;
-    B.OnClickRight = TabClicked;
-    B.IDValue = 0;
-    B.XPosition = 0.01;
-    B.YPosition = 0.08;
-    B.XSize = 0.18;
-    B.YSize = 0.055;
-    B.ExtravDir = 1;
-    TabButtons.AddItem(B);
-    AddComponent(B);
+    SubPages[DoshMenuBanking] = BankingPage;
 
     // Trader tab button (to the right of banking)
     B = new (Self) class'KFGUI_GreenButton';
     B.ButtonText = TraderButtonText;
     B.OnClickLeft = TabClicked;
     B.OnClickRight = TabClicked;
-    B.IDValue = 1;
-    B.XPosition = 0.20;
+    B.IDValue = DoshMenuWeapon;
+    B.XPosition = 0.01;
     B.YPosition = 0.08;
     B.XSize = 0.18;
     B.YSize = 0.055;
@@ -83,11 +78,25 @@ function InitMenu()
     B.ButtonText = AbilityButtonText;
     B.OnClickLeft = TabClicked;
     B.OnClickRight = TabClicked;
-    B.IDValue = 2;
+    B.IDValue = DoshMenuAbility;
+    B.XPosition = 0.20;
+    B.YPosition = 0.08;
+    B.XSize = 0.18;
+    B.YSize = 0.055;
+    TabButtons.AddItem(B);
+    AddComponent(B);
+
+    // Banking tab button
+    B = new (Self) class'KFGUI_GreenButton';
+    B.ButtonText = BankingButtonText;
+    B.OnClickLeft = TabClicked;
+    B.OnClickRight = TabClicked;
+    B.IDValue = DoshMenuBanking;
     B.XPosition = 0.39;
     B.YPosition = 0.08;
     B.XSize = 0.18;
     B.YSize = 0.055;
+    B.ExtravDir = 1;
     TabButtons.AddItem(B);
     AddComponent(B);
 
@@ -109,11 +118,13 @@ function InitMenu()
 
 function TabClicked(KFGUI_Button Sender)
 {
-    SelectPage(Sender.IDValue);
+    SelectPage(DoshMenuButtonIDs(Sender.IDValue));
 }
 
-final function SelectPage(int Index)
+final function SelectPage(DoshMenuButtonIDs ButtonID)
 {
+    local ExtPlayerController EPC;
+
     if (CurrentPageIndex >= 0 && PageComponentIndex >= 0)
     {
         TabButtons[CurrentPageIndex].bIsHighlighted = false;
@@ -121,14 +132,21 @@ final function SelectPage(int Index)
         Components.Remove(PageComponentIndex, 1);
         PageComponentIndex = -1;
     }
-    CurrentPageIndex = (Index >= 0 && Index < SubPages.Length) ? Index : -1;
-    if (CurrentPageIndex >= 0)
+    CurrentPageIndex = ButtonID;
+
+    if (CurrentPageIndex == DoshMenuWeapon)
     {
-        TabButtons[CurrentPageIndex].bIsHighlighted = true;
-        SubPages[CurrentPageIndex].ShowMenu();
-        PageComponentIndex = Components.Length;
-        Components.AddItem(SubPages[CurrentPageIndex]);
+        EPC = ExtPlayerController(GetPlayer());
+        if (EPC != None)
+        {
+            EPC.ServerSetWeaponMaxLevels();
+        }
     }
+
+    TabButtons[CurrentPageIndex].bIsHighlighted = true;
+    SubPages[CurrentPageIndex].ShowMenu();
+    PageComponentIndex = Components.Length;
+    Components.AddItem(SubPages[CurrentPageIndex]);
 }
 
 function DoClose()
@@ -136,9 +154,9 @@ function DoClose()
     local ExtPlayerController KFPC;
 	// apply weapon upgrade
     KFPC = ExtPlayerController(GetPlayer());
-    if (KFPC != None)
+    if (KFPC != None && KFPC.bShouldApplyUpgrades)
     {
-        KFPC.ApplyWeaponUpgrades();
+        KFPC.ApplyAllUpgrades();
     }
 
     super.DoClose();

@@ -13,6 +13,7 @@ var localized string ColumnDescriptionText;
 var localized string SpAbil_PerkGrenade;
 var localized string SpAbil_RocketJump;
 var localized string SpAbil_MGRs;
+var localized string SpAbil_HemoStrike;
 var localized string SpAbil_Unknown;
 
 function InitMenu()
@@ -147,6 +148,8 @@ function string GetSpecialAbilityName(SpecialAbilities Ability)
             return SpAbil_RocketJump;
         case SpAbil_MGRs:
             return SpAbil_MGRs;
+        case SpAbil_HemoStrike:
+            return SpAbil_HemoStrike;
         default:
             return SpAbil_Unknown;
     }
@@ -162,11 +165,10 @@ function OnSpAbilSelected(KFGUI_ListItem Item, int Row, bool bRight, bool bDblCl
 
 function OnUseAbilClicked(KFGUI_Button Sender)
 {
-    if (ExtPC == None) 
-        ExtPC = ExtPlayerController(GetPlayer());
 
-    if (ExtPC == None || SpAbilList == None)
+    if (!GetExtPlayer(ExtPC) || SpAbilList == None)
         return;
+
     // Implementation for setting the sp weapon
     `log("OnUseAbilClicked called for " @ SelectedIdx @ ": " @ ExtPC.SpecialAbil[SelectedIdx]);
     if (SelectedIdx >= 0 && SelectedIdx < ExtPC.SpecialAbil.Length)
@@ -175,10 +177,42 @@ function OnUseAbilClicked(KFGUI_Button Sender)
 
 function DrawMenu()
 {
+    local string AbilName;
+    local string AbilDescription;
+    
+    if (!GetExtPlayer(ExtPC))
+        return;
+    
     Super.DrawMenu();
     
     // Draw description text in the middle of the left side
-    Canvas.SetPos(CompPos[0] + CompPos[2] * 0.01, CompPos[1] + CompPos[3] * 0.45);
+    Canvas.SetPos(CompPos[0] + CompPos[2] * 0.01, CompPos[1] + CompPos[3] * 0.01);
     Canvas.SetDrawColor(255, 255, 255, 255);
-    Canvas.DrawText("Info about the Sp weapon goes here...");
+    GetAbilityText(ExtPC.SpecialAbil[SelectedIdx], AbilName, AbilDescription);
+    Canvas.DrawText(AbilName);
+    Canvas.DrawText(AbilDescription);
+}
+
+function GetAbilityText(SpecialAbilities Ability, out string Name, out string Description)
+{
+    // `log("UIP_SpAbilPage.GetAbilityText: " @ Ability);
+    switch (Ability)
+    {
+        case SpAbil_PerkGrenade:
+            Name = SpAbil_PerkGrenade;
+            Description = "Toss a grenade with the same effects as your perk's grenade";
+            break;
+        case SpAbil_RocketJump:
+            Name = SpAbil_RocketJump;
+            Description = class'Ext_TraitSA_RocketJump'.default.Description;
+            break;
+        case SpAbil_MGRs:
+            Name = SpAbil_MGRs;
+            Description = class'Ext_TraitSA_MGRs'.default.Description;
+            break;
+        default:
+            Name = "No ability selected.";
+            Description = "";
+            break;
+    }
 }

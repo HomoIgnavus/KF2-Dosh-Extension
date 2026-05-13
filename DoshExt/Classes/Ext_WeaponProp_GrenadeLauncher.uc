@@ -4,9 +4,9 @@ var class<KFProjectile> Projectile;
 var float BaseAoE;
 var float BaseProjDmg;
 
-public function DefInit(class<KFWeaponDefinition> WeaponDefParam)
+public function DefInit(class<KFWeaponDefinition> WeaponDefParam, string RemarkParam)
 {
-    super.DefInit(WeaponDefParam);
+    super.DefInit(WeaponDefParam, RemarkParam);
 
     Projectile = class<KFProjectile>(WeaponClass.default.WeaponProjectiles[0]);
     BaseAoE = Projectile.default.ExplosionTemplate.DamageRadius;

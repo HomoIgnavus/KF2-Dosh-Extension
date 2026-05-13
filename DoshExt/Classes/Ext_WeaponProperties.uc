@@ -9,10 +9,21 @@ enum UpgradeTypes
     DoTUp,
 };
 
+struct WeaponUpgradeState
+{
+    var bool bHasData;
+    var class<KFWeapon> WeaponClass;
+    var int DamageLv;
+    var int PenetrationLv;
+    var int AoELv;
+    var int DoTLv;
+};
+
 var ExtPlayerReplicationInfo ExtPRI;
 
 var public class<KFWeaponDefinition> WeaponDef;
 var public class<KFWeapon> WeaponClass;
+var public string Remark;
 var public KFWeapon WeaponInstance;
 var public int DamageLv;
 var public array<float> BaseDamage;
@@ -28,6 +39,8 @@ var public bool bCanUpgradeDamage;
 var public bool bCanUpgradeAoE;
 var public bool bCanUpgradeDoT;
 var public bool bCanUpgradePenetration;
+
+var config int MinLevel;
 
 var config int MaxDmgLv;
 var config int MaxAoELv;
@@ -49,10 +62,13 @@ var public int NextAoECost;
 var public int NextDoTCost;
 var public int NextPenetrationCost;
 var public int TotalValue;
+var public bool bCanBeSold;
 
 // called when the weapon is added to the player's inventory
 public function PCInit(ExtPlayerController PCParam, KFWeapon WeaponParam)
 {
+    local WeaponInfo WPI;
+    
     ExtPRI = ExtPlayerReplicationInfo(PCParam.PlayerReplicationInfo);
     if (ExtPRI == none)
     {
@@ -68,34 +84,32 @@ public function PCInit(ExtPlayerController PCParam, KFWeapon WeaponParam)
         PCParam.WeaponList.LoadWeapons();
     }
 
-    if (PCParam.WeaponList != None)
+    if (PCParam.WeaponList == None)
     {
-        WeaponDef = PCParam.WeaponList.GetWeaponDef(WeaponParam.Class);
+        `log("Failed to initialize Ext_WeaponProperties: WeaponList is None");
+        return;
     }
 
-    if (WeaponDef == None && PCParam.WeaponPage != None)
+    if (!PCParam.WeaponList.GetWeaponInfo(WeaponParam.Class, WPI))
     {
-        WeaponDef = PCParam.WeaponPage.GetWeaponProperties(WeaponParam.Class).WeaponDef;
+        `log("Failed to get weapon info for " @ WeaponParam.class);
+        return;
     }
 
-    if (WeaponDef == None)
+    if (WPI.WeaponDef == None)
     {
         `log("Failed to resolve weapon definition for " @ WeaponParam.Class);
         return;
     }
 
-    DefInit(WeaponDef);
+    DefInit(WPI.WeaponDef, WPI.Remark);
     ApplyModifiers();
 }
 
-public function DefInit(class<KFWeaponDefinition> WeaponDefParam)
+public function DefInit(class<KFWeaponDefinition> WeaponDefParam, string RemarkParam)
 {
-    // if (ExtPRI == none)
-    // {
-    //     `log("Failed to initialize Ext_WeaponProperties for " @ WeaponDefParam);
-    //     return;
-    // }
     WeaponDef = WeaponDefParam;
+    Remark = RemarkParam;
 
     if (WeaponDefParam == None)
     {
@@ -109,6 +123,9 @@ public function DefInit(class<KFWeaponDefinition> WeaponDefParam)
         `log("Failed to load weapon instance: " @ WeaponDefParam.Default.WeaponClassPath);
         return;
     }
+
+    if (WeaponClass == class'ExtWeap_Knife_FieldMedicRapid')
+        bCanBeSold = false;
     
     DamageLv=0;
     BaseDamage=WeaponClass.default.InstantHitDamage;
@@ -149,7 +166,7 @@ public static function SetMaxLvs(PlayerReplicationInfo PRIParam)
 {
     local ExtPlayerReplicationInfo LocalPRI;
     local Ext_PerkBase CurrentPerk;
-    local int Prestige;
+    local int MaxLv;
 
     LocalPRI = ExtPlayerReplicationInfo(PRIParam);
     if (LocalPRI == none)
@@ -158,34 +175,63 @@ public static function SetMaxLvs(PlayerReplicationInfo PRIParam)
         return;
     }
 
-    // Try to get prestige from replicated ECurrentPerkPrestige first
-    if (LocalPRI.ECurrentPerkPrestige > 0)
-    {
-        Prestige = LocalPRI.ECurrentPerkPrestige;
-        `log("Ext_WeaponProperties.SetMaxLvs: Using replicated ECurrentPerkPrestige=" @ Prestige);
-    }
-    else
-    {
-        // Fallback to FCurrentPerk if available
-        CurrentPerk = LocalPRI.FCurrentPerk;
-        if (CurrentPerk == None)
-        {
-            `log("Ext_WeaponProperties.SetMaxLvs: FCurrentPerk is None and ECurrentPerkPrestige=0, using default max level 10");
-            Prestige = 10;
-        }
-        else
-        {
-            Prestige = CurrentPerk.CurrentPrestige;
-            `log("Ext_WeaponProperties.SetMaxLvs: Using FCurrentPerk.CurrentPrestige=" @ Prestige);
-        }
-    }
+    MaxLv = LocalPRI.ECurrentPerkPrestige + default.MinLevel;
+    `log("Ext_WeaponProperties.SetMaxLvs: MinLevel=" @ default.MinLevel @ " MaxLv=" @ MaxLv);
 
-    default.MaxDmgLv = Prestige;
-    default.MaxAoELv = Prestige;
-    default.MaxDotLv = Prestige;
-    default.MaxPenetrationLv = Prestige;
+    // if (MaxLv > 0)
+    // {
+    //     MaxLv = LocalPRI.ECurrentPerkPrestige;
+    // }
+    // else
+    // {
+    //     // Fallback to FCurrentPerk if available
+    //     // CurrentPerk = LocalPRI.FCurrentPerk;
+    //     `log("Ext_WeaponProperties.SetMaxLvs: FCurrentPerk is None and ECurrentPerkPrestige=0, using default max level 10");
+    //     MaxLv = MinLevel;
+    //     // else
+    //     // {
+    //     //     MaxLv = CurrentPerk.CurrentPrestige;
+    //     //     `log("Ext_WeaponProperties.SetMaxLvs: Using FCurrentPerk.CurrentPrestige=" @ MaxLv);
+    //     // }
+    // }
+
+    default.MaxDmgLv = MaxLv;
+    default.MaxAoELv = MaxLv;
+    default.MaxDotLv = MaxLv;
+    default.MaxPenetrationLv = MaxLv;
 
     `log("Ext_WeaponProperties.SetMaxLvs: MaxDmgLv=" @ default.MaxDmgLv @ " MaxAoELv=" @ default.MaxAoELv @ " MaxDotLv=" @ default.MaxDotLv @ " MaxPenetrationLv=" @ default.MaxPenetrationLv);
+}
+
+public function SyncUpgradeState(WeaponUpgradeState UpgradeStat)
+{
+    local bool bLvModified;
+
+    if (UpgradeStat.WeaponClass != WeaponClass) return;
+        
+    if (DamageLv != UpgradeStat.DamageLv)
+    { 
+        bLvModified = true;
+        DamageLv = UpgradeStat.DamageLv;
+    }
+    if (PenetrationLv != UpgradeStat.PenetrationLv)
+    { 
+        bLvModified = true;
+        PenetrationLv = UpgradeStat.PenetrationLv;
+    }
+    if (AoELv != UpgradeStat.AoELv)
+    { 
+        bLvModified = true;
+        AoELv = UpgradeStat.AoELv;
+    }
+    if (DoTLv != UpgradeStat.DoTLv)
+    { 
+        bLvModified = true;
+        DoTLv = UpgradeStat.DoTLv;
+    }
+
+    if (bLvModified) 
+        ApplyModifiers();
 }
 
 public function ApplyModifiers()
@@ -208,8 +254,6 @@ public function ApplyModifiers()
         }
     }
 
-
-
     if (PenetrationLv > 0)
     {
         for (Idx = 0; Idx < WeaponInstance.PenetrationPower.Length; Idx++)
@@ -218,9 +262,7 @@ public function ApplyModifiers()
         }
     }
 
-
-
-    `log("ApplyModifiers: modded stats: Dmg=" @ WeaponInstance.InstantHitDamage[0] @ " Penetration=" @ WeaponInstance.PenetrationPower[0]);
+    `log("ApplyModifiers: Weapon=" @ WeaponInstance.Class.Name @ " Dmg=" @ WeaponInstance.InstantHitDamage[0] @ " Penetration=" @ WeaponInstance.PenetrationPower[0]);
 }
 
 public function Bool CanAddDamage()
@@ -254,69 +296,75 @@ public function Bool CanAddPenetration()
 }
 
 
-public function AddDamage()
+public function int AddDamage()
 {
-
+    local int AmountCharged;
+    
     if (!CanAddDamage())
-        return;
+        return 0;
 
+    AmountCharged = NextDmgCost;
     DamageLv++;
-    ExtPRI.AddDosh(-NextDmgCost);
     TotalValue += NextDmgCost;
 
     if (DamageLv < default.MaxDmgLv)
         NextDmgCost = Round(BasePrice * DmgCost * (1 + DamageLv));
     else
         NextDmgCost = 0;
+    return AmountCharged;
 }
 
-
-
-public function AddPenetration()
+public function int AddPenetration()
 {
+    local int AmountCharged;
     if (!CanAddPenetration())
-        return;
+        return 0;
 
+    AmountCharged = NextPenetrationCost;
     PenetrationLv++;
-    ExtPRI.AddDosh(-NextPenetrationCost);
     TotalValue += NextPenetrationCost;
 
     if (PenetrationLv < default.MaxPenetrationLv)
         NextPenetrationCost = Round(BasePrice *  PenetrationCost * (1 + PenetrationLv));
     else
         NextPenetrationCost = 0;
+    return AmountCharged;
 }
 
-
-
-public function AddAoE()
+public function int AddAoE()
 {
+    local int AmountCharged;
     if (!CanAddAoE())
-        return;
+        return 0;
 
+    AmountCharged = NextAoECost;
     AoELv += 1.0;
-    ExtPRI.AddDosh(-NextAoECost);
     TotalValue += NextAoECost;
 
     if (AoELv < MaxAoELv)
         NextAoECost = Round(BasePrice * AoECost * (1 + AoELv));
     else
         NextAoECost = 0;
+
+    return AmountCharged;
 }
 
-public function AddDot()
+public function int AddDot()
 {
-    if (!CanAddDot())
-        return;
+    local int AmountCharged;
 
+    if (!CanAddDot())
+        return 0;
+
+    AmountCharged = NextDoTCost;
     DoTLv += 1.0;
-    ExtPRI.AddDosh(-NextDoTCost);
     TotalValue += NextDoTCost;
 
     if (DoTLv < MaxDoTLv)
         NextDoTCost = Round(BasePrice * DoTCost * (1 + DoTLv));
     else
         NextDoTCost = 0;
+    return AmountCharged;
 }
 
 public function string GetItemName()
@@ -338,8 +386,6 @@ public function int GetCostAoE()
 {
     return NextAoECost;
 }
-
-
 
 public function int GetCostPenetration()
 {
@@ -372,25 +418,25 @@ public function string GetUpgradeInfo(UpgradeTypes Type)
         case DamageUp:
             if (BaseDamage.Length == 0) return "0 (Lv 0)";
             Modified = BaseDamage[0] * (1.0 + DmgPerLv * DamageLv);
-            if (DamageLv == 0) return Round(Modified) @ "(Lv 0)";
-            return Round(Modified) @ "(Lv" $ DamageLv @ "+" $ Round(DmgPerLv * DamageLv * 100) $ "%)";
+            // if (DamageLv == 0) return Round(Modified) @ "(Lv 0)";
+            return Round(Modified) @ "(Lv" $ DamageLv @ "/" @ default.MaxDmgLv @ "+" $ Round(DmgPerLv * DamageLv * 100) $ "%)";
             break;
             
         case AoEUp:
-            if (AoELv == 0) return "(Lv 0)";
-            return "(Lv" $ AoELv @ "+" $ Round(AoEPerLv * AoELv * 100) $ "%)";
+            if (AoELv == 0) return "(Lv 0/" @ default.MaxAoELv @ ")";
+            return "(Lv" $ AoELv @ "/" @ default.MaxAoELv @ "+" $ Round(AoEPerLv * AoELv * 100) $ "%)";
             break;
             
         case DoTUp:
-            if (DoTLv == 0) return "(Lv 0)";
-            return "(Lv" $ DoTLv @ "+" $ Round(DoTPerLv * DoTLv * 100) $ "%)";
+            if (DoTLv == 0) return "(Lv 0/" @ default.MaxDotLv @ ")";
+            return "(Lv" $ DoTLv @ "/" @ default.MaxDotLv @ "+" $ Round(DoTPerLv * DoTLv * 100) $ "%)";
             break;
             
         case PenetrationUp:
             if (BasePenetration.Length == 0) return "0 (Lv 0)";
             Modified = BasePenetration[0] * (1.0 + PenetrationPerLv * PenetrationLv);
-            if (PenetrationLv == 0) return Round(Modified) @ "(Lv 0)";
-            return Round(Modified) @ "(Lv" $ PenetrationLv @ "+" $ Round(PenetrationPerLv * PenetrationLv * 100) $ "%)";
+            // if (PenetrationLv == 0) return Round(Modified) @ "(Lv 0/" @ default.MaxPenetrationLv @ ")";
+            return Round(Modified) @ "(Lv" $ PenetrationLv @ "/" @ default.MaxPenetrationLv @ "+" $ Round(PenetrationPerLv * PenetrationLv * 100) $ "%)";
             break;
             
         default:
@@ -399,6 +445,17 @@ public function string GetUpgradeInfo(UpgradeTypes Type)
     }
 }
 
+public function WeaponUpgradeState GetUpgradeState()
+{
+    local WeaponUpgradeState UpgradeState;
+    UpgradeState.bHasData = true;
+    UpgradeState.WeaponClass = WeaponClass;
+    UpgradeState.DamageLv = DamageLv;
+    UpgradeState.PenetrationLv = PenetrationLv;
+    UpgradeState.AoELv = AoELv;
+    UpgradeState.DoTLv = DoTLv;
+    return UpgradeState;
+}
 
 static final operator(24) bool == ( Ext_WeaponProperties A, Ext_WeaponProperties B )
 {
@@ -408,4 +465,14 @@ static final operator(24) bool == ( Ext_WeaponProperties A, Ext_WeaponProperties
 static final operator(26) bool != ( Ext_WeaponProperties A, Ext_WeaponProperties B )
 {
     return A.WeaponClass != B.WeaponClass;
+}
+
+defaultproperties
+{
+    MinLevel=3
+    DamageLv=0
+    PenetrationLv=0
+    AoELv=0
+    DoTLv = 0
+    bCanBeSold = true
 }

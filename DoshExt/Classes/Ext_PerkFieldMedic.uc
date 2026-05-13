@@ -30,6 +30,14 @@ var bool bUseToxicDamage,bUseSlug,bUseAirborneAgent;
 
 var const class<KFDamageType> ToxicDmgTypeClass;
 
+// var bool bCanResurrect;
+var bool bCanResurrect;
+
+var int MisslesPerShot;
+var int HemoStrikeRadius;
+var const int HemoStrikeHeight;
+var const int HemoStrikeInterval;
+
 simulated function ModifyDamageGiven(out int InDamage, optional Actor DamageCauser, optional KFPawn_Monster MyKFPM, optional KFPlayerController DamageInstigator, optional class<KFDamageType> DamageType, optional int HitZoneIdx)
 {
 	local float TempDamage;
@@ -42,6 +50,7 @@ simulated function ModifyDamageGiven(out int InDamage, optional Actor DamageCaus
 	InDamage = Round(TempDamage);
 
 	Super.ModifyDamageGiven(InDamage, DamageCauser, MyKFPM, DamageInstigator, DamageType, HitZoneIdx);
+
 }
 
 simulated function ModifyMagSizeAndNumber(KFWeapon KFW, out int MagazineCapacity, optional array< Class<KFPerk> > WeaponPerkClass, optional bool bSecondary=false, optional name WeaponClassname)
@@ -208,6 +217,40 @@ simulated function float GetSelfHealingSurgePct()
 	return SelfHealingSurgePct;
 }
 
+reliable server function ResurrectAll()
+{
+	local ExtPlayerController TeammatePC;
+	local KFPlayerReplicationInfo ThisPRI;
+	local ExtPlayerReplicationInfo TeammatePRI;
+
+	ThisPRI = PerkManager.PRIOwner;
+    foreach WorldInfo.AllControllers(class'ExtPlayerController', TeammatePC)
+    {
+        TeammatePRI = ExtPlayerReplicationInfo(TeammatePC.PlayerReplicationInfo);
+        
+        // If the player is dead and currently being tracked for respawn (RespawnCounter >= 0)
+        if (TeammatePRI != None && TeammatePRI.RespawnCounter >= 0)
+        {
+            // Set to 1 to trigger an almost-instant respawn by the mutator
+            TeammatePRI.RespawnCounter = 1;
+            
+            // Notify the team
+			BroadcastLocalizedTeamMessage(0, class'ExtLocalMessages', EMT_Medic_Resurrection_Team, ThisPRI, TeammatePRI);
+
+			// Show a message for the player who was resurrected
+			TeammatePC.ClientMessage(Class'ExtLocalMessages'.static.GetString(EMT_Medic_Resurrection_Player, true, ThisPRI));
+			`log(ThisPRI.PlayerName @ " resurrected " @ TeammatePRI.PlayerName);
+        }
+    }
+}
+
+function PerkConsumeAbilityPoints(int Amount)
+{
+	if (!bCanResurrect || Amount <= 0) return;
+
+	ResurrectAll();
+}
+
 defaultproperties
 {
 	PerkIcon=Texture2D'UI_PerkIcons_TEX.UI_PerkIcon_Medic'
@@ -221,6 +264,10 @@ defaultproperties
 	DefTraitList.Add(class'Ext_TraitZedative')
 	DefTraitList.Add(class'Ext_TraitAirborneAgent')
 	DefTraitList.Add(class'Ext_TraitArmorRep')
+	DefTraitList.Add(class'Ext_TraitHemoExplosion')
+	DefTraitList.Add(class'Ext_TraitRapidSurgery')
+	DefTraitList.Add(class'Ext_TraitSA_Resurrection')
+	DefTraitList.Add(class'Ext_TraitSA_HemoStrike')
 	BasePerk=class'KFPerk_FieldMedic'
 	HealExpUpNum=3
 
@@ -249,6 +296,7 @@ defaultproperties
 	DefPerkStats(20)=(bHiddenConfig=false) // Heal recharge
 
 	PrimaryMelee=class'KFWeap_Knife_FieldMedic'
+	// PrimaryMelee=class'ExtWeap_Knife_FieldMedicRapid'
 	PrimaryWeapon=None
 	PerkGrenade=class'KFProj_MedicGrenade'
 	SuperGrenade=class'ExtProj_SUPERMedGrenade'
@@ -259,4 +307,7 @@ defaultproperties
 	GrenadeWeaponDef=class'KFWeapDef_Grenade_Medic'
 
 	AutoBuyLoadOutPath=(class'KFWeapDef_MedicSMG', class'KFWeapDef_MedicShotgun', class'KFWeapDef_MedicRifle')
+
+	HemoStrikeHeight = 500
+	HemoStrikeInterval = 0.3
 }

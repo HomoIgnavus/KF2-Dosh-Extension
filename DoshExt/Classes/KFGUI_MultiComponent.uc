@@ -146,3 +146,10 @@ function NotifyLevelChange()
 	for (i=0; i<Components.Length; ++i)
 		Components[i].NotifyLevelChange();
 }
+
+function bool GetExtPlayer(out ExtPlayerController ExtPC)
+{
+    ExtPC = ExtPlayerController(GetPlayer());
+
+	return ExtPC != none;
+}

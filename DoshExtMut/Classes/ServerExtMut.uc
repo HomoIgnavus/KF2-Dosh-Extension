@@ -76,6 +76,10 @@ var config bool bKillMessages,bDamageMessages,bEnableMapVote,bNoAdminCommands,bN
 
 var KFGI_Access KFGIA;
 
+var public float XpScale;
+var public float ExtraXpPerWave;
+var private float CurrentXpScale;
+
 //Custom XP lightly array
 struct CustomZedXPStruct
 {
@@ -92,6 +96,28 @@ var array<CustomZedXPStruct> CustomZedXPArray;
 // 	KFGI = KFGameInfo(WorldInfo.Game);
 // 	KFGI.DefaultPawnClass = class'ExtHumanPawn';
 // }
+
+function InitMutator(string Options, out string ErrorMessage)
+{
+	local string OptionRead;
+	
+	Super.InitMutator(Options, ErrorMessage);
+	
+	// Parse URL options for XP scaling passed from CGM_Survival
+	OptionRead = WorldInfo.Game.ParseOption(Options, "XpScale");
+	if (OptionRead != "")
+	{
+		XpScale = float(OptionRead);
+		`log("ServerExtMut: XpScale set to" @ XpScale @ "from URL options");
+	}
+	
+	OptionRead = WorldInfo.Game.ParseOption(Options, "ExtraXpPerWave");
+	if (OptionRead != "")
+	{
+		ExtraXpPerWave = float(OptionRead);
+		`log("ServerExtMut: ExtraXpPerWave set to" @ ExtraXpPerWave @ "from URL options");
+	}
+}
 
 function PostBeginPlay()
 {
@@ -277,7 +303,9 @@ function PostBeginPlay()
 	UpdateCustomZedXPArray();
 	// Causes bugs
 	// SetTimer(0.1,'CheckPickupFactories')
+	// `log("ServerExtMut loaded. Build 20260507-0750");
 }
+
 
 function UpdateCustomZedXPArray()
 {
@@ -367,6 +395,10 @@ function NotifyWaveChange()
 			KFProj_Bolt_Crossbow(KFBolt) != none)
 			KFBolt.Destroy();
 	}
+
+	// set xp scale
+	CurrentXpScale = XpScale *(1.0 + ExtraXpPerWave * KF.WaveNum);
+	`log("NotifyWaveChange WaveNum="@KF.WaveNum@" XpScale="@CurrentXpScale);
 }
 
 function SetupWebAdmin()
@@ -484,6 +516,8 @@ function CustomXP(Controller Killer, Controller Killed)
 			XP = KFM.static.GetXPValue(MyKFGI.GameDifficulty);
 		}
 
+		XP = Round(XP * CurrentXpScale);
+
 		InstigatorPerk = KFPC.GetPerk();
 
 		// Special for survivalist - he gets experience for everything
@@ -542,7 +576,10 @@ function ScoreKill(Controller Killer, Controller Killed)
 
 	ExtPC = ExtPlayerController(Killed);
 	if (ExtPC != None)
+	{	
+		`log("ServerExtMut.ScoreKill(): player died");
 		CheckPerkChange(ExtPC);
+	}
 
 	if (NextMutator != None)
 		NextMutator.ScoreKill(Killer, Killed);
@@ -948,6 +985,7 @@ function Timer()
 	local bool bSpawned,bAllDead;
 
 	bAllDead = (KFGameInfo(WorldInfo.Game).GetLivingPlayerCount()<=0 || WorldInfo.Game.bGameEnded || !bRespawnCheck);
+	// `log("ServerExtMut.Timer(): AllDead=" @bAllDead@ " Living=" @KFGameInfo(WorldInfo.Game).GetLivingPlayerCount()@ " bRespawnCheck=" @bRespawnCheck);
 	for (i=0; i<PendingSpawners.Length; ++i)
 	{
 		PC = PendingSpawners[i];
@@ -1787,4 +1825,8 @@ defaultproperties
 	WebConfigs.Add((PropType=3,PropName="ServerMOTD",UIName="MOTD",UIDesc="Message of the Day"))
 	WebConfigs.Add((PropType=2,PropName="BonusGameSongs",UIName="Bonus Game Songs",UIDesc="List of custom musics to play during level change pong game.",NumElements=-1))
 	WebConfigs.Add((PropType=2,PropName="BonusGameFX",UIName="Bonus Game FX",UIDesc="List of custom FX to play on pong game.",NumElements=-1))
+
+	XpScale = 1.0
+	ExtraXpPerWave = 0.0
+	CurrentXpScale = 1.0
 }

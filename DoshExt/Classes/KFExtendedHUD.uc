@@ -97,6 +97,7 @@ var transient OnlineSubsystem OnlineSub;
 var localized string BadConnectionStr;
 
 var transient bool bShowProgress,bProgressDC,bConfirmDisconnect,bMeAdmin,bLoadedInitItems;
+var transient bool bIsUsingMGRs;
 
 simulated function PostBeginPlay()
 {
@@ -308,6 +309,8 @@ event PostRender()
 	PLCameraDir = vector(PLCameraRot);
 	PLCameraDot = (PLCameraDir Dot PLCameraLoc);
 
+	if (bIsUsingMGRs)
+		DrawMGRsBackground();
 	if (MyCurrentPet.Length>0)
 		DrawPetInfo();
 	if (EPRI==None)
@@ -339,6 +342,48 @@ event PostRender()
 	}
 	if (PlayerOwner.Player==None && OnlineSub!=None)
 		NotifyLevelChange();
+}
+
+public function DrawMGRsBackground()
+{
+	local float CenterX, CenterY;
+	local float Radius;
+	local int NumSegments;
+	local int i;
+	local float Angle, NextAngle;
+	local float X1, Y1, X2, Y2;
+
+	// Calculate center of screen
+	CenterX = Canvas.ClipX * 0.5;
+	CenterY = Canvas.ClipY * 0.5;
+
+	// Set circle radius
+	Radius = 100.0;
+
+	// Number of segments for smooth circle (more = smoother)
+	NumSegments = 32;
+
+	// Set gold color with 50% transparency
+	Canvas.SetDrawColor(255, 215, 0, 128);
+
+	// Draw circle by drawing lines between points
+	for (i = 0; i < NumSegments; i++)
+	{
+		Angle = (i / float(NumSegments)) * 6.28318; // 2 * PI
+		NextAngle = ((i + 1) / float(NumSegments)) * 6.28318;
+
+		// Calculate start point
+		X1 = CenterX + Radius * Cos(Angle);
+		Y1 = CenterY + Radius * Sin(Angle);
+
+		// Calculate end point
+		X2 = CenterX + Radius * Cos(NextAngle);
+		Y2 = CenterY + Radius * Sin(NextAngle);
+
+		// Draw line segment
+		Canvas.SetPos(X1, Y1);
+		Canvas.DrawTile(Canvas.DefaultTexture, X2 - X1, Y2 - Y1, 0, 0, 1, 1);
+	}
 }
 
 simulated function CancelConnection()

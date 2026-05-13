@@ -33,6 +33,7 @@ var private float ParryHealPct;
 var private float ParryArmorPct;
 
 var private bool bIsParryExplosionActive;
+var public bool bIsParryCoolingDown;
 // var private float ParryExpDmg;
 // var private float ParryExpAoE;
 
@@ -57,7 +58,7 @@ replication
 
 simulated function ModifyMeleeAttackSpeed(out float InDuration)
 {
-	InDuration *= Modifiers[4];
+	InDuration *= Modifiers[ExtStat_Spread];
 	if (ZedTimeMeleeAtkRate<1.f && WorldInfo.TimeDilation<1.f)
 		InDuration *= ZedTimeMeleeAtkRate;
 }
@@ -66,7 +67,7 @@ simulated function ModifyRateOfFire(out float InRate, KFWeapon KFW)
 {
 	if (IsWeaponOnPerk(KFW))
 	{
-		InRate *= Modifiers[4];
+		InRate *= Modifiers[ExtStat_Spread];
 		if (ZedTimeMeleeAtkRate<1.f && WorldInfo.TimeDilation<1.f)
 			InRate *= ZedTimeMeleeAtkRate;
 	}
@@ -82,6 +83,9 @@ simulated function TriggerTraitParry(Actor Target = none)
 	if (ExtP == None)
 		return;
 
+	if (bIsParryCoolingDown) return;
+	bIsParryCoolingDown = true;
+		
 	ActivateParryBuff();
 
 	if (bIsParryExplosionActive)
@@ -93,17 +97,24 @@ simulated function TriggerTraitParry(Actor Target = none)
 	
 	if (bIsParryHealActive)
 		TriggerParryHeal(ExtP);
+
+	SetTimer(0.5f, false, 'ClearParryCoolDown');
 }
 
-simulated function TriggerParryProj(KFWeap_MeleeBase ActiveWeapon, Actor Target)
+function ClearParryCoolDown()
 {
-	local AkBaseSoundObject Sound;
-	local ParticleSystem PSTemplate;
-	
-	ActiveWeapon.GetParryEffects(255, Sound, PSTemplate);
-	ActiveWeapon.PlayLocalBlockEffects(Sound, PSTemplate);
-	TriggerTraitParry(Target);
+	bIsParryCoolingDown = false;
 }
+
+// simulated function TriggerParryProj(KFWeap_MeleeBase ActiveWeapon, Actor Target)
+// {
+// 	local AkBaseSoundObject Sound;
+// 	local ParticleSystem PSTemplate;
+	
+// 	ActiveWeapon.GetParryEffects(255, Sound, PSTemplate);
+// 	ActiveWeapon.PlayLocalBlockEffects(Sound, PSTemplate);
+// 	TriggerTraitParry(Target);
+// }
 
 simulated function TriggerParryHeal(ExtHumanPawn ExtP)
 {
@@ -132,7 +143,7 @@ simulated function TriggerParryExplosion(Actor Target)
 	if (Role == ROLE_Authority)
 	{
 		// Spawn EMP-like explosion centered on the player
-		HitLocation = Target.Location;;
+		HitLocation = Target.Location;
 
 		ExploActor = Spawn(class'KFExplosionActorReplicated', self,, HitLocation, rotator(vect(0,0,1)),, true);
 		if (ExploActor != None)
@@ -367,4 +378,5 @@ defaultproperties
 	bHasTraitBombzerker = false
 	FallDamageScale = 1.0;
 	bIsAtomic = false
+	bIsParryCoolingDown = false
 }

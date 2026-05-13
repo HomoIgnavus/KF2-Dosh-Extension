@@ -1,5 +1,6 @@
 ## Description
 A fork of GenZmeY's KF2-Server-Extension(https://github.com/GenZmeY/KF2-Server-Extension)
+Steamworkshop: https://steamcommunity.com/sharedfiles/filedetails/?id=3711253158
 
 ## Changes
 - Removed 255 limit of Magazine size
@@ -8,13 +9,16 @@ A fork of GenZmeY's KF2-Server-Extension(https://github.com/GenZmeY/KF2-Server-E
 - HP healing rate changed from 10HP/s to 5%HP/s
 
 ## New stuffs
+- new URL options: XpScale and ExtraXpPerWave. 
+    - Usage example: start the game with ?XpScale=2.0?ExtraXpPerWave=0.1, then in the first wave you get 2x Xp and 2.2x in the second wave 
 - When you prestige, the level after you prestige is now the difference between your current level and the minimum prestige level
     - E.g. when minimum prestige level is 200, your prestige at level 240, then you will be level 40 after prestige
 - You can no longer throw dosh (see below for details)
 - Stock trader menu is replaced by a custom trader menu:
     - The menu can be opened by pressing throw money button
-    - It uses a custom upgrade mechanism. You can upgrad your weapons damage, penetration, AoE (Rocket launchers), DoT (Fire weapons)
+    - It uses a custom upgrade mechanism. You can upgrade your weapons damage, penetration, AoE (Rocket launchers), DoT (Fire weapons)
     - The maximum upgrade level increases with your perk prestige
+    - Note: the upgrade system assumes that each player carries at most 15 weapons. If a player carries over 15 weapons it will cause errors.
 
 ## New Traits
 - All: Airbag Armor
@@ -40,12 +44,14 @@ A fork of GenZmeY's KF2-Server-Extension(https://github.com/GenZmeY/KF2-Server-E
     - Consuming n% of the magazine your current weapon reloads other weapons in your inventory
 - Survivalist: Scavanger
     - Randomly get ammo/HP/armor/Dosh by killing zeds
+- Medic: Ext_TraitRapidSurgery
 
 ### Abilities
 - Commando: Military Grade Rounds
-    - Shoots your dosh
-- Demolitionist: Suicide Bomb
-    - Blow yourself up and deal n% of your HP as damage to all zeds alive
+    - Reminds you of Metro 2033
+- Demolitionist
+    - Suicide Bomb: Blow yourself up and deal n% of your HP as damage to all zeds alive
+    - Explosive Dosh: Throw doshes and make them explode on impact
 - Firebug:
     - Blackhole grenade
 - Support:

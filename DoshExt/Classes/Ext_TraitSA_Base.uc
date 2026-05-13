@@ -24,11 +24,24 @@ enum SpecialAbilities
 	SpAbil_PerkGrenade,
 	SpAbil_RocketJump,
 	SpAbil_MGRs,
+	SpAbil_HemoStrike,
 	SpAbil_None,
 };
 
-var float DmgRatio[5];
-var float PntRatio[5];
+static function bool MeetsRequirements(byte Lvl, Ext_PerkBase Perk)
+{
+	local int TraitIdx;
+
+	// First check level.
+	if (Perk.CurrentLevel < Default.MinLevel || Perk.CurrentPrestige < 1)
+		return false;
+
+	TraitIdx = Perk.PerkTraits.Find('TraitType', class'Ext_TraitSA_Gauge');
+	if (TraitIdx < 0 || Perk.PerkTraits[TraitIdx].CurrentLevel < 1)
+		return false;
+	
+	return true;
+}
 
 static function AddAbility(ExtHumanPawn Player, SpecialAbilities Ability)
 {
@@ -39,7 +52,11 @@ static function AddAbility(ExtHumanPawn Player, SpecialAbilities Ability)
 	{	
 		`log("Ext_TraitSA_Base.AddAbility: BEFORE Add - Ability param = " @ Ability @ ", Array length = " @ EPC.SpecialAbil.Length);
 		
-		EPC.SpecialAbil.AddItem(Ability);
+		if (EPC.SpecialAbil.Find(Ability) == INDEX_NONE)
+		{
+			EPC.SpecialAbil.AddItem(Ability);
+			EPC.ClientAddSpecialAbility(Ability);
+		}
 		
 		`log("Ext_TraitSA_Base.AddAbility: AFTER Add - Array length = " @ EPC.SpecialAbil.Length);
 		for (idx = 0; idx < EPC.SpecialAbil.Length; idx++)
@@ -56,17 +73,15 @@ static function RemoveAbility(ExtHumanPawn Player, SpecialAbilities Ability)
 	local ExtPlayerController EPC;
 	EPC = ExtPlayerController(Player.Controller);
 	if (EPC != None)
+	{
 		EPC.SpecialAbil.RemoveItem(Ability);
+		EPC.ClientRemoveSpecialAbility(Ability);
+	}
 }
 
 defaultproperties
 {
 	TraitGroup=class'Ext_TGroupSpAbility'
 
-	NumLevels=3
-	
-	DefLevelCosts(0)=100
-	DefLevelCosts(1)=200
-	DefLevelCosts(2)=400
-	
+	NumLevels=1
 }

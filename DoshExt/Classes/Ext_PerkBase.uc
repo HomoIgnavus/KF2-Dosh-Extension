@@ -1181,6 +1181,32 @@ simulated function PlayerDied()
 	}
 }
 
+enum Ext_StatType
+{
+	ExtStat_Speed,
+	ExtStat_Damage,
+	ExtStat_Recoil,
+	ExtStat_Spread,
+	ExtStat_FireRate,
+	ExtStat_MeleeSpeed,
+	ExtStat_Reload,
+	ExtStat_Health,
+	ExtStat_KnockDown,
+	ExtStat_Welder,
+	ExtStat_Heal,
+	ExtStat_Mag,
+	ExtStat_Spare,
+	ExtStat_OffDamage,
+	ExtStat_SelfDamage,
+	ExtStat_Armor,
+	ExtStat_PoisonDmg,
+	ExtStat_SonicDmg,
+	ExtStat_FireDmg,
+	ExtStat_AllDmg,
+	ExtStat_HeadDamage,
+	ExtStat_HealRecharge,
+	ExtStat_Switch,
+};
 // Stat modifier functions.
 simulated function float ApplyEffect(name Type, float Value, float Progress)
 {
@@ -1191,19 +1217,19 @@ simulated function float ApplyEffect(name Type, float Value, float Progress)
 	switch (Type)
 	{
 	case 'Speed':
-		Modifiers[0] = 1.f + (Value*Progress);
+		Modifiers[ExtStat_Speed] = 1.f + (Value*Progress);
 		break;
 	case 'Damage':
-		Modifiers[1] = 1.f + (Value*Progress);
+		Modifiers[ExtStat_Damage] = 1.f + (Value*Progress);
 		break;
 	case 'Recoil':
-		Modifiers[2] = 1.f - (Value*Progress);
+		Modifiers[ExtStat_Recoil] = 1.f - (Value*Progress);
 		break;
 	case 'Spread':
-		Modifiers[3] = 1.f - (Value*Progress);
+		Modifiers[ExtStat_Spread] = 1.f - (Value*Progress);
 		break;
 	case 'Rate':
-		Modifiers[4] = 1.f / (1.f+Value*Progress);
+		Modifiers[ExtStat_FireRate] = 1.f / (1.f+Value*Progress);
 		break;
 	case 'Reload':
 		Modifiers[5] = 1.f / (1.f+Value*Progress);
@@ -1285,9 +1311,9 @@ simulated function ModifyDamageGiven(out int InDamage, optional Actor DamageCaus
 	if (BasePerk==None || (DamageType!=None && DamageType.Default.ModifierPerkList.Find(BasePerk)>=0) || (KFWeapon(DamageCauser)!=None && IsWeaponOnPerk(KFWeapon(DamageCauser))))
 	{
 		if (HitZoneIdx == 0)
-			InDamage *= (Modifiers[1] + Modifiers[19]);
+			InDamage *= (Modifiers[ExtStat_Damage] + Modifiers[19]);
 		else
-			InDamage *= Modifiers[1];
+			InDamage *= Modifiers[ExtStat_Damage];
 	}
 	else if (DamageType==None || DamageType.Name!='KFDT_SuicideExplosive')
 		InDamage *= Modifiers[12];
@@ -1313,18 +1339,18 @@ simulated function ModifyDamageTaken(out int InDamage, optional class<DamageType
 simulated function ModifyRecoil(out float CurrentRecoilModifier, KFWeapon KFW)
 {
 	if (IsWeaponOnPerk(KFW))
-		CurrentRecoilModifier *= Modifiers[2];
+		CurrentRecoilModifier *= Modifiers[ExtStat_Recoil];
 }
 
 simulated function ModifySpread(out float InSpread)
 {
-	InSpread *= Modifiers[3];
+	InSpread *= Modifiers[ExtStat_Spread];
 }
 
 simulated function ModifyRateOfFire(out float InRate, KFWeapon KFW)
 {
 	if (IsWeaponOnPerk(KFW))
-		InRate *= Modifiers[4];
+		InRate *= Modifiers[ExtStat_Spread];
 }
 
 simulated function float GetReloadRateScale(KFWeapon KFW)
@@ -1334,7 +1360,7 @@ simulated function float GetReloadRateScale(KFWeapon KFW)
 
 simulated function float GetCameraViewShakeModifier(KFWeapon KFW)
 {
-	return Modifiers[2];
+	return Modifiers[ExtStat_Recoil];
 }
 
 function ModifyHealth(out int InHealth)
@@ -1534,8 +1560,10 @@ simulated function float GetZedTimeExtensions(byte Level)
 
 simulated function float GetTightChokeModifier()
 {
-	return Modifiers[3];
+	return Modifiers[ExtStat_Spread];
 }
+
+function PerkConsumeAbilityPoints(int Amount);
 
 defaultproperties
 {

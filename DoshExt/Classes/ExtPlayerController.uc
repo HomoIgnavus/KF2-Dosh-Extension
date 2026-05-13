@@ -16,7 +16,11 @@
 // You should have received a copy of the GNU General Public License along
 // with Server Extension. If not, see <https://www.gnu.org/licenses/>.
 
-Class ExtPlayerController extends KFPlayerController;
+Class ExtPlayerController extends KFPlayerController
+	dependson(Ext_TraitSA_Base);
+
+var public ExtHumanPawn EHP;
+var public ExtInventoryManager EIM;
 
 var localized string GotItemText;
 var localized string KilledHimselfWith;
@@ -36,8 +40,16 @@ var Ext_WeaponList WeaponList;
 var array<Ext_WeaponProperties> InvProperties;
 
 var array<SpecialAbilities> SpecialAbil;
+var int AbilityGaugePerKill;
 
 var public bool bCanRocketJump;
+
+// medic hemo strike
+var private array<vector> HemoStrikeLocs;
+var private int HemoStrikeIdx;
+var private int HemoStrikeMissilePerShot;
+var private float HemoStrikeInterval;
+var private bool bIsFiringHemoStrike;
 
 struct FAdminCmdType
 {
@@ -78,7 +90,10 @@ var globalconfig bool bShowFPLegs,bHideNameBeacons,bHideKillMsg,bHideDamageMsg,b
 var globalconfig int SelectedEmoteIndex;
 var bool bMOTDReceived,bNamePlateShown,bNamePlateHidden,bClientHideKillMsg,bClientHideDamageMsg,bClientHideNumbers,bNoDamageTracking,bClientNoZed,bSetPerk;
 
-var SpecialAbilities CurrentSpecialAbility;
+var byte CurrentSpecialAbility;
+
+var repnotify WeaponUpgradeState WeaponUpgradeStates[15];
+var bool bShouldApplyUpgrades;
 
 struct SavedSkins
 {
@@ -87,174 +102,461 @@ struct SavedSkins
 };
 var globalconfig array<SavedSkins> SavedWeaponSkins;
 
+replication
+{
+	// Things the server should send to the client.
+	if (bNetDirty)
+		MidGameMenuClass, ActivePerkManager, WeaponUpgradeStates, bShouldApplyUpgrades;
+}
+
+simulated event ReplicatedEvent(name VarName)
+{
+    if (Role < ROLE_Authority)
+    {
+		if (VarName == 'WeaponUpgradeStates')
+        {
+			// `log("ExtPlayerController.ReplicatedEvent: WeaponUpgradeStates replicated, syncing all upgrades");
+			SyncPropAndUpgrades();
+        	ApplyAllUpgrades();
+			bShouldApplyUpgrades = false;
+		}
+    }
+    
+    Super.ReplicatedEvent(VarName);
+}
+
+event Possess(Pawn aPawn, bool bVehicleTransition)
+{
+	local class<Pawn> PawnClass;
+    
+    super.Possess(aPawn, bVehicleTransition);
+    
+    EHP = ExtHumanPawn(aPawn);
+	EIM = ExtInventoryManager(aPawn.InvManager);
+
+	if (aPawn != None)
+		PawnClass = aPawn.Class;
+	else
+		PawnClass = class'Pawn';
+	
+	`log("ExtPlayerController.Possess: Role=" @ Role @ " aPawn=" @ aPawn @ " aPawn.Class=" @ string(PawnClass));
+	if (EHP == None)
+	{	
+		`log("ExtPlayerController: EHP is none!");
+	}
+	else
+	{
+        `log("ExtPlayerController: EHP set successfully: " @ EHP);
+		
+	}
+	// ServerRecreateUpgradeStates();
+	// ClientRecreateWeaponProperties();
+}
+
+event UnPossess()
+{
+	super.UnPossess();
+	EHP = None;
+	EIM = None;
+}
+
 private function bool HasWeaponPropertyIndex(int PropIdx)
 {
 	return PropIdx >= 0 && PropIdx < InvProperties.Length && InvProperties[PropIdx] != None;
 }
 
-private function SyncWeaponPropertyToClient(int PropIdx)
+// recreate weapon upgrade states from the current weapon properties
+private reliable server function ServerSyncWeaponUpgrades()
 {
+	local int PropIdx;
+	local int UpIdx;
+
+	for (PropIdx = 0; PropIdx < InvProperties.Length && PropIdx < 15; PropIdx++)
+	{
+		WeaponUpgradeStates[PropIdx] = InvProperties[PropIdx].GetUpgradeState();
+	}
+
+	// empty the remaining entries
+	for (UpIdx = PropIdx; UpIdx < 15; UpIdx++)
+	{
+		WeaponUpgradeStates[UpIdx].bHasData = false;
+	}
+}
+
+reliable server function ServerRecreateUpgradeStates()
+{
+	local int Idx;
+	ServerClearUpgradeStates();
+	
+	for (Idx = 0; Idx < InvProperties.Length; Idx++)
+	{
+		WeaponUpgradeStates[Idx] = InvProperties[Idx].GetUpgradeState();
+	}
+	// bClientRecreateUpgradeStates = true;
+}
+
+reliable server function ServerRecreateWeaponProperties()
+{
+	local int Idx;
+	local Inventory Inv;
+	local KFWeapon KFW;
 	local Ext_WeaponProperties WPP;
+	local WeaponUpgradeState WUS;
 
-	if (!HasWeaponPropertyIndex(PropIdx))
+	// clear existing stuffs
+	InvProperties.Length = 0;
+	ServerClearUpgradeStates();
+
+	for (Inv = EHP.InvManager.InventoryChain; Inv != None; Inv = Inv.Inventory)
 	{
-		return;
+		KFW = KFWeapon(Inv);
+		if (
+			KFW != None && 
+			(
+				(
+					!ClassIsChildOf(KFW.Class, class'KFweapDef_Knife_Base') &&
+					KFW.Class != class'ExtWeap_Pistol_9mm' && 
+					KFW.Class != class'ExtWeap_Pistol_MedicS' && 
+					KFW.Class != class'KFWeap_Welder' &&
+					KFW.Class != class'KFWeap_Healer_Syringe'
+				) ||
+				KFW.Class == class'ExtWeap_Knife_FieldMedicRapid'
+			)
+		)
+		{
+			WPP = new class'Ext_WeaponProperties';
+			WPP.PCInit(self, KFW);
+			InvProperties.AddItem(WPP);
+
+			WUS = WPP.GetUpgradeState();
+			WeaponUpgradeStates[InvProperties.Length - 1] = WUS;
+		}
 	}
 
-	WPP = InvProperties[PropIdx];
-	ClientSyncWeaponProperty(PropIdx,
-		WPP.DamageLv,
-		WPP.AoELv,
-		WPP.PenetrationLv,
-		WPP.NextDmgCost,
-		WPP.NextAoECost,
-		WPP.NextPenetrationCost,
-		WPP.TotalValue);
-	ClientApplyWeaponUpgrades();
+	`log("ServerRecreateWeaponProperties() Created " @ InvProperties.Length @ " weapon properties");
 }
 
-private function CommitWeaponUpgrade(int PropIdx)
+// recreate Weapon Properties from the replicated upgrade states
+reliable client function ClientRecreateWeaponProperties()
 {
-	if (!HasWeaponPropertyIndex(PropIdx))
-	{
-		return;
-	}
-
-	if (InvProperties[PropIdx].WeaponInstance != None)
-	{
-		InvProperties[PropIdx].ApplyModifiers();
-	}
-
-	SyncWeaponPropertyToClient(PropIdx);
-}
-
-reliable client function ClientSyncWeaponProperty(
-	int PropIdx,
-	int NewDamageLv,
-	int NewAoELv,
-	int NewPenetrationLv,
-	int NewNextDmgCost,
-	int NewNextAoECost,
-	int NewNextPenetrationCost,
-	int NewTotalValue)
-{
+	local int Idx;
+	local Inventory Inv;
+	local KFPawn KFP;
+	local KFWeapon KFW;
 	local Ext_WeaponProperties WPP;
+	local WeaponUpgradeState WUS;
 
-	if (!HasWeaponPropertyIndex(PropIdx))
-	{
+	`log("ClientRecreateWeaponProperties called");
+
+	KFP = KFPawn(Pawn);
+	if (KFP == None)
+	{ 
+		`log("ExtPlayerController.ClientRecreateWeaponProperties: KFPawn is None, retrying in 1 second");
+		SetTimer(1, false, 'ClientRecreateWeaponProperties');
 		return;
 	}
 
-	WPP = InvProperties[PropIdx];
-	WPP.DamageLv = NewDamageLv;
-	WPP.AoELv = NewAoELv;
-	WPP.PenetrationLv = NewPenetrationLv;
-	WPP.NextDmgCost = NewNextDmgCost;
-	WPP.NextAoECost = NewNextAoECost;
-	WPP.NextPenetrationCost = NewNextPenetrationCost;
-	WPP.TotalValue = NewTotalValue;
-
-	if (WPP.WeaponInstance != None)
+	if (KFP.InvManager == None)
 	{
-		WPP.ApplyModifiers();
+		`log("ExtPlayerController.ClientRecreateWeaponProperties: KFP.InvManager is None, retrying in 1 second");
+		SetTimer(1, false, 'ClientRecreateWeaponProperties');
+		return;
 	}
 
-	if (WeaponPage != None)
+	InvProperties.Length = 0;
+	for (Idx = 0; Idx < 15; Idx++)
 	{
-		WeaponPage.Timer();
-		WeaponPage.UpdateStatsDisplay();
+		WUS = WeaponUpgradeStates[Idx];
+		if (!WUS.bHasData) break;
+
+		for (Inv = KFP.InvManager.InventoryChain; Inv != None; Inv = Inv.Inventory)
+		{
+			KFW = KFWeapon(Inv);
+			if (KFW != None && KFW.Class == WUS.WeaponClass)
+			{
+				WPP = new class'Ext_WeaponProperties';
+				WPP.PCInit(self, KFW);
+				WPP.SyncUpgradeState(WUS);
+				InvProperties.AddItem(WPP);
+			}
+		}
+	}
+
+	`log("ClientRecreateWeaponProperties() Created " @ InvProperties.Length @ " weapon properties");
+}
+
+function SyncPropAndUpgrades()
+{
+	if (Role == ROLE_Authority)
+		ServerRecreateUpgradeStates();
+	else
+		ClientRecreateWeaponProperties();
+}
+
+function int GetStatesCount()
+{
+	local int idx;
+	local int StatesCount;
+
+	StatesCount = 0;
+	for (Idx = 0; Idx < 15; Idx++)
+	{
+		if (!WeaponUpgradeStates[Idx].bHasData) break;
+		StatesCount++;
+	}
+
+	return StatesCount;
+}
+
+function CheckPropAndUpgrades()
+{
+	local int idx;
+
+	if (InvProperties.Length != GetStatesCount())
+	{
+		`log("ExtPlayerController.CheckPropAndUpgrades: InvProperties.Length != GetStatesCount()");
+		SyncPropAndUpgrades();
+		return;
+	}
+
+	for (idx = 0; idx < InvProperties.Length; idx++)
+	{
+		if (!WeaponUpgradeStates[idx].bHasData || InvProperties[idx].WeaponClass != WeaponUpgradeStates[idx].WeaponClass)
+		{
+			`log("ExtPlayerController.CheckPropAndUpgrades: Mismatch found at index " @ idx);
+			SyncPropAndUpgrades();
+			return;
+		}
+	}
+
+	// check for excessive upgrade states
+	for (idx = InvProperties.Length; idx < 15; idx++)
+	{
+		if (WeaponUpgradeStates[idx].bHasData)
+		{
+			`log("ExtPlayerController.CheckPropAndUpgrades: Unexpected upgrade state found at index " @ idx);
+			WeaponUpgradeStates[idx].bHasData = false;
+		}
 	}
 }
 
-reliable server function ServerUpgradeWeaponDamage(int PropIdx)
+private function ApplyWeaponUpgrade(int PropIdx)
 {
-	// `log("ExtPlayerController.ServerUpgradeWeaponDamage: PropIdx=" @ PropIdx @ " InvProperties.Length=" @ InvProperties.Length);
+
+	if (InvProperties[PropIdx].WeaponInstance == None) 
+	{
+		`log("ExtPlayerController.ApplyWeaponUpgrade: WeaponInstance is None for PropIdx=" @ PropIdx);
+		return;
+	}
+
+	if (!WeaponUpgradeStates[PropIdx].bHasData)
+	{
+		`log("ExtPlayerController.ApplyWeaponUpgrade: No upgrade data for PropIdx=" @ PropIdx);
+		return;
+	}
+
+	if (WeaponUpgradeStates[PropIdx].WeaponClass != InvProperties[PropIdx].WeaponClass)
+	{
+		`log("ExtPlayerController.ApplyWeaponUpgrade: Mismatched weapon class for PropIdx=" @ PropIdx@ " on "@Role);
+		CheckPropAndUpgrades();
+	}
+
+	// InvProperties[PropIdx].SyncUpgradeState(WeaponUpgradeStates[PropIdx]);
+	InvProperties[PropIdx].ApplyModifiers();
+	// `log("ExtPlayerController.ApplyWeaponUpgrade: weapon=" @ InvProperties[PropIdx].WeaponClass.Name @ " states=" @ WeaponUpgradeStates[PropIdx].DamageLv @ ", " @ WeaponUpgradeStates[PropIdx].AoELv @ ", " @ WeaponUpgradeStates[PropIdx].PenetrationLv @ ", " @ WeaponUpgradeStates[PropIdx].DotLv);
+}
+
+reliable server function ServerApplyAllUpgrades()
+{
+	ApplyAllUpgrades();
+}
+
+function ApplyAllUpgrades()
+{
+	local int Idx;
+	// `log("ExtPlayerController.ApplyAllUpgrades: Executed on " @ Role);
+
+	if (Role < ROLE_Authority)
+	{
+		ServerApplyAllUpgrades();
+	}
+
+	CheckPropAndUpgrades();
+	
+	for (Idx = 0; Idx < InvProperties.Length; Idx++)
+	{
+		ApplyWeaponUpgrade(Idx);
+	}
+	bShouldApplyUpgrades = false;
+}
+
+reliable server function ServerUpgradeWeapon(int PropIdx, UpgradeTypes UpType)
+{
+	local int AmountCharged;
+	local KFPlayerReplicationInfo KFPRI;
+
+	KFPRI = KFPlayerReplicationInfo(PlayerReplicationInfo);
+	if (KFPRI == none) return;
+
+	KFPRI.AddDosh(-UpgradeWeaponStat(PropIdx, UpType));
+}
+
+reliable client function ClientUpgradeWeaponStat(int PropIdx, UpgradeTypes UpType)
+{
+	UpgradeWeaponStat(PropIdx, UpType);
+}
+
+function int UpgradeWeaponStat(int PropIdx, UpgradeTypes UpType)
+{
+	local int AmountCharged;
+	// local int AmountCharged;
+	if (Role == role_Authority) 
+	{
+		ClientUpgradeWeaponStat(PropIdx, UpType);
+	}
+
+	`log("UpgradeWeaponStat executed on " @ Role);
 	
 	if (!HasWeaponPropertyIndex(PropIdx))
 	{
 		// `log("ExtPlayerController.ServerUpgradeWeaponDamage: FAILED - Invalid PropIdx");
-		return;
+		return 0;
 	}
 
 	// `log("ExtPlayerController.ServerUpgradeWeaponDamage: Calling AddDamage on InvProperties[" @ PropIdx @ "]");
-	InvProperties[PropIdx].AddDamage();
-	CommitWeaponUpgrade(PropIdx);
+	switch (UpType)
+	{
+		case DamageUp: 
+			AmountCharged = InvProperties[PropIdx].AddDamage(); 
+			if (AmountCharged > 0)
+			{	
+				WeaponUpgradeStates[PropIdx].DamageLv++;
+			}
+			break;
+		case AoEUp: 
+			AmountCharged = InvProperties[PropIdx].AddAoE(); 
+			if (AmountCharged > 0)
+			{	
+				WeaponUpgradeStates[PropIdx].AoELv++;
+			}
+			break;
+		case PenetrationUp: 
+			AmountCharged = InvProperties[PropIdx].AddPenetration();
+			if (AmountCharged > 0)
+			{	
+				WeaponUpgradeStates[PropIdx].PenetrationLv++;
+			}
+			break;
+		case DoTUp: 
+			AmountCharged = InvProperties[PropIdx].AddDot(); 
+			if (AmountCharged > 0)
+			{	
+				WeaponUpgradeStates[PropIdx].DotLv++;
+			}
+			break;
+		default:
+			break;
+	}
+
+	bShouldApplyUpgrades = true;
+	return AmountCharged;
 	// `log("ExtPlayerController.ServerUpgradeWeaponDamage: Upgrade complete");
 }
 
-reliable server function ServerUpgradeWeaponAoE(int PropIdx)
+reliable server function ServerUpgradeMax(int PropIdx, UpgradeTypes UpType)
 {
-	// `log("ExtPlayerController.ServerUpgradeWeaponAoE: PropIdx=" @ PropIdx);
+	local KFPlayerReplicationInfo KFPRI;
+
+	KFPRI = KFPlayerReplicationInfo(PlayerReplicationInfo);
+	if (KFPRI == none) return;
+
+	KFPRI.AddDosh(-UpgradeMax(PropIdx, UpType, KFPRI.Score));
+}
+
+reliable client function ClientUpgradeMax(int PropIdx, UpgradeTypes UpType, int TotalCash)
+{
+	UpgradeMax(PropIdx, UpType, TotalCash);
+}
+
+function int UpgradeMax(int PropIdx, UpgradeTypes UpType, int TotalCash)
+{
+	local int LastCharged;
+	local int TotalCharged;
+
+
+	if (Role < ROLE_Authority)
+	{
+		ClientUpgradeMax(PropIdx, UpType, TotalCash);
+	}
 	
-	if (!HasWeaponPropertyIndex(PropIdx))
+	`log("UpgradeMax executed on " @ Role);
+
+	TotalCharged = 0;
+
+	switch (UpType)
 	{
-		// `log("ExtPlayerController.ServerUpgradeWeaponAoE: FAILED - Invalid PropIdx");
-		return;
+		case DamageUp: 
+			while (true)
+			{
+				LastCharged = InvProperties[PropIdx].AddDamage();
+				if (LastCharged > 0 && LastCharged <= TotalCash)
+				{
+					WeaponUpgradeStates[PropIdx].DamageLv++;
+					TotalCharged += LastCharged;
+					TotalCash -= LastCharged;
+				}
+				else
+					break;
+			}
+			break;
+		case AoEUp: 
+			while (true)
+			{
+				LastCharged = InvProperties[PropIdx].AddAoE();
+				if (LastCharged > 0 && LastCharged <= TotalCash)
+				{
+					WeaponUpgradeStates[PropIdx].AoELv++;
+					TotalCharged += LastCharged;
+					TotalCash -= LastCharged;
+				}
+				else
+					break;
+			}
+			break;
+		case PenetrationUp: 
+			while (true)
+			{
+				LastCharged = InvProperties[PropIdx].AddPenetration();
+				if (LastCharged > 0 && LastCharged <= TotalCash)
+				{
+					WeaponUpgradeStates[PropIdx].PenetrationLv++;
+					TotalCharged += LastCharged;
+					TotalCash -= LastCharged;
+				}
+				else
+					break;
+			}
+			break;
+		case DoTUp: 
+			while (true)
+			{
+				LastCharged = InvProperties[PropIdx].AddDot();
+				if (LastCharged > 0 && LastCharged <= TotalCash)
+				{
+					WeaponUpgradeStates[PropIdx].DotLv++;
+					TotalCharged += LastCharged;
+					TotalCash -= LastCharged;
+				}
+				else
+					break;
+			}
+			break;
+		default:
+			break;
 	}
 
-	InvProperties[PropIdx].AddAoE();
-	CommitWeaponUpgrade(PropIdx);
-}
-
-
-
-reliable server function ServerUpgradeWeaponPenetration(int PropIdx)
-{
-	// `log("ExtPlayerController.ServerUpgradeWeaponPenetration: PropIdx=" @ PropIdx);
-	
-	if (!HasWeaponPropertyIndex(PropIdx))
-	{
-		// `log("ExtPlayerController.ServerUpgradeWeaponPenetration: FAILED - Invalid PropIdx");
-		return;
-	}
-
-	InvProperties[PropIdx].AddPenetration();
-	CommitWeaponUpgrade(PropIdx);
-}
-
-reliable server function ServerUpgradeWeaponDoT(int PropIdx)
-{
-	// `log("ExtPlayerController.ServerUpgradeWeaponDoT: PropIdx=" @ PropIdx);
-	
-	if (!HasWeaponPropertyIndex(PropIdx))
-	{
-		// `log("ExtPlayerController.ServerUpgradeWeaponDoT: FAILED - Invalid PropIdx");
-		return;
-	}
-
-	InvProperties[PropIdx].AddDot();
-	CommitWeaponUpgrade(PropIdx);
-}
-
-reliable server function ServerApplyWeaponUpgrades()
-{
-	ApplyWeaponUpgrades();
-}
-
-reliable client function ClientApplyWeaponUpgrades()
-{
-	local int idx;
-
-	for (idx = 0; idx < InvProperties.Length; idx++)
-	{
-		if (InvProperties[idx].WeaponInstance != None)
-		{
-			InvProperties[idx].ApplyModifiers();
-		}
-	}
-
-	if (WeaponPage != None)
-	{
-		WeaponPage.Timer();
-		WeaponPage.UpdateStatsDisplay();
-	}
-}
-
-replication
-{
-	// Things the server should send to the client.
-	if (bNetDirty)
-		MidGameMenuClass,ActivePerkManager;
+	bShouldApplyUpgrades = true;
+	return TotalCharged;
 }
 
 simulated function PostBeginPlay()
@@ -376,6 +678,11 @@ function AddZedKill(class<KFPawn_Monster> MonsterClass, byte Difficulty, class<D
 	{
 		ActivePerkManager.TotalKills++;
 		ActivePerkManager.PRIOwner.RepKills++;
+	}
+
+	if (EHP != None)
+	{
+		EHP.AddAbilityGauge(AbilityGaugePerKill);
 	}
 }
 
@@ -761,8 +1068,8 @@ simulated final function ToggleFPBody(bool bEnable)
 	bShowFPLegs = bEnable;
 	Class'ExtPlayerController'.Default.bShowFPLegs = bEnable;
 
-	if (ExtHumanPawn(Pawn)!=None)
-		ExtHumanPawn(Pawn).UpdateFPLegs();
+	if (EHP!=None)
+		EHP.UpdateFPLegs();
 }
 
 /*exec function KickBan(string S)
@@ -783,7 +1090,9 @@ Delegate OnChangePerk(ExtPlayerController PC, class<Ext_PerkBase> NewPerk);
 reliable server function SwitchToPerk(class<Ext_PerkBase> PerkClass)
 {
 	if (PerkClass!=None)
+	{
 		OnChangePerk(Self,PerkClass);
+	}
 }
 
 Delegate OnBoughtStats(ExtPlayerController PC, class<Ext_PerkBase> PerkClass, int iStat, int Amount);
@@ -1006,7 +1315,62 @@ unreliable server function ServerPlayVoiceCommsDialog(int CommsIndex)
 	}
 }
 
-delegate UseSpAbil();
+function int GetAbilityGauge()
+{
+	local ExtHumanPawn LocalEHP;
+	
+	// Use Pawn property which is replicated, or fall back to cached EHP
+	LocalEHP = ExtHumanPawn(Pawn);
+	if (LocalEHP == None)
+		LocalEHP = EHP;
+	
+	if (LocalEHP == None) 
+	{
+		`log("GetAbilityGauge(): No valid pawn found");
+		return 0;
+	}
+	
+	return LocalEHP.AbilityGauge;
+}
+
+function int GetGrenadeCount()
+{
+	local ExtHumanPawn LocalEHP;
+	local ExtInventoryManager LocalEIM;
+	
+	// Use Pawn property which is replicated, or fall back to cached references
+	LocalEHP = ExtHumanPawn(Pawn);
+	if (LocalEHP == None)
+		LocalEHP = EHP;
+	
+	if (LocalEHP != None && LocalEHP.InvManager != None)
+		LocalEIM = ExtInventoryManager(LocalEHP.InvManager);
+	else if (EIM != None)
+		LocalEIM = EIM;
+	
+	if (LocalEHP == None || LocalEIM == None) 
+		return 0;
+
+	if (CurrentSpecialAbility == 0) // SpAbil_PerkGrenade
+		return LocalEIM.GrenadeCount;
+	
+	return LocalEHP.AbilityCount;
+}
+
+/****************************************
+	Special Abilities
+ */
+delegate int AbilDelegate();
+
+function UseAbility()
+{
+	if (AbilDelegate == none)
+	{
+		AbilDelegate = SA_Grenade;
+	}
+
+	ActivePerkManager.CurrentPerk.PerkConsumeAbilityPoints(AbilDelegate());
+}
 
 function SetSpAbil(SpecialAbilities SpAbil)
 {
@@ -1014,34 +1378,208 @@ function SetSpAbil(SpecialAbilities SpAbil)
 	switch (SpAbil)
 	{
 		case SpAbil_PerkGrenade:
-			UseSpAbil = SA_Grenade;
+			AbilDelegate = SA_Grenade;
 			break;
 		case SpAbil_RocketJump:
-			UseSpAbil = SA_RocketJump;
+			AbilDelegate = SA_RocketJump;
+			break;
+		case SpAbil_HemoStrike:
+			AbilDelegate = SA_HemoStrike;
 			break;
 		case SpAbil_MGRs:
-			UseSpAbil = SA_MGRsReload;
+			AbilDelegate = SA_MGRsReload;
 			break;
 		default:
 			break;
 	}
 }
 
-function SA_Grenade()
+function bool ConsumeAbilityPoints(int Amount = 1)
+{
+	EHP = ExtHumanPawn(Pawn);
+	if (EHP == None || EHP.AbilityCount <= 0) return false;
+	
+	if (EHP.AbilityCount - Amount < 0)
+		return false;
+	
+	EHP.AbilityCount -= Amount;
+	ActivePerkManager.CurrentPerk.PerkConsumeAbilityPoints(Amount);
+	return true;
+}
+
+function int SA_Grenade()
 {
 	Super.StartFire(4);
+	return 0;
 }
 
-function SA_MGRsReload()
+/********************
+	Commando
+ */
+function int SA_MGRsReload()
 {
+	EHP = ExtHumanPawn(Pawn);
+	if (EHP != None)
+		EHP.MGRs_Reload();
 
+	return 1;
 }
+/*
+	Commando
+ ********************/
 
-function SA_RocketJump()
+/********************
+	Zerker
+ */
+function int SA_RocketJump()
 {
-	// Pawn.SetPhysics(PHYS_Falling);
-	Pawn.Velocity += vect(0.0f, 0.0f, 10000.0f);
+	if (Role < ROLE_Authority)
+	{
+		ServerRocketJump();
+	}
+	
+	if (ConsumeAbilityPoints(1))
+	{
+		Pawn.SetPhysics(PHYS_Falling);
+		Pawn.Velocity += vect(0.0f, 0.0f, 10000.0f);
+	}
+	return 1;
 }
+
+reliable server function ServerRocketJump()
+{
+	SA_RocketJump();
+}
+/*
+	Zerker
+ ********************/
+
+/********************
+	Medic
+ */
+simulated function PrepareHemoStrike()
+{
+	local Ext_PerkFieldMedic MedicPerk;
+	local int Count;
+	local vector RandomLoc;
+	local vector StrikeCenter;
+	local int TotalShots;
+	local float Dist, Angle, RandX, RandY;
+
+
+	MedicPerk = Ext_PerkFieldMedic(ActivePerkManager.CurrentPerk);
+	if (MedicPerk == None)
+	{
+		`log("SA_HemoStrike: Perk is not medic!");
+		return;
+	}
+	HemoStrikeMissilePerShot = MedicPerk.MisslesPerShot;
+
+	StrikeCenter = Pawn.Location;
+	StrikeCenter.Z += MedicPerk.default.HemoStrikeHeight;
+	// StrikeCenter.Z += 10.0;
+
+	TotalShots = MedicPerk.HemoStrikeRadius / 500.0;
+	TotalShots = TotalShots * TotalShots * HemoStrikeMissilePerShot;
+
+	HemoStrikeLocs.Length = 0;
+	HemoStrikeIdx = 0;
+	for (Count = 0; Count < TotalShots; Count++)
+	{
+		Angle = FRand() * 2.0 * Pi;
+		Dist = FRand() * MedicPerk.HemoStrikeRadius;
+		RandX = Dist * Cos(Angle);
+		RandY = Dist * Sin(Angle);
+
+		RandomLoc.x = StrikeCenter.X + RandX;
+		RandomLoc.y = StrikeCenter.Y + RandY;
+		RandomLoc.z = StrikeCenter.Z;
+
+		HemoStrikeLocs.AddItem(RandomLoc);
+	}
+
+	`log("PrepareHemoStrike: HemoStrikeLocs.Length = " @ HemoStrikeLocs.Length);
+}
+
+simulated function FireHemoStrikeMissle(Vector Loc)
+{
+	local KFProj_Rocket_HRG_MedicMissile Missile;
+	local Vector Dir;
+	// `log("FireHemoStrikeMissle: Loc=" @ Loc @ " Role=" @ Role);
+
+	Dir = Vect(0.0, 0.0, -1.0);
+
+	Missile = Spawn(class'KFProj_Rocket_HRG_MedicMissile', Pawn.Weapon != None ? Pawn.Weapon : Pawn, , loc, rotator(Dir),, true);
+	if (Missile != none)
+	{
+		Missile.Instigator = Pawn;
+		Missile.bSyncToThirdPersonMuzzleLocation = false; // Prevent snapping to weapon muzzle on other clients
+		// Missile.bBlockedByInstigator = true;
+		Missile.OriginalLocation = Loc;
+		Missile.Init(Dir);
+		// Missile.SyncOriginalLocation();
+	}
+}
+
+reliable server function Timer_FireHemoStrikeMissles()
+{
+	local int firecount;
+
+	for (firecount = 0; firecount < HemoStrikeMissilePerShot && HemoStrikeIdx < HemoStrikeLocs.Length; firecount++)
+	{
+		FireHemoStrikeMissle(HemoStrikeLocs[HemoStrikeIdx]);
+		HemoStrikeIdx++;
+	}
+	`log("Timer_FireHemoStrikeMissles() HemoStrikeIdx=" @ HemoStrikeIdx @ "interval=" @ HemoStrikeInterval);
+
+	if (HemoStrikeIdx < HemoStrikeLocs.Length)
+	{
+		SetTimer(0.3, false, 'Timer_FireHemoStrikeMissles');
+	}
+	else
+	{
+		bIsFiringHemoStrike = false;
+	}
+}
+
+reliable server function int LaunchHemoStrike()
+{
+	if (bIsFiringHemoStrike)
+	{
+		`log("LaunchHemoStrike: already firing HemoStrike");
+		return 0;
+	}
+
+	PrepareHemoStrike();
+	SetTimer(0.1, false, 'Timer_FireHemoStrikeMissles');
+	`log("LaunchHemoStrike: firing HemoStrike");
+	bIsFiringHemoStrike = true;
+	return 1;
+}
+
+function int SA_HemoStrike()
+{
+	return LaunchHemoStrike();
+}
+/*
+	Medic
+ ********************/
+
+reliable client function ClientAddSpecialAbility(SpecialAbilities Ability)
+{
+	if (SpecialAbil.Find(Ability) == INDEX_NONE)
+	{
+		SpecialAbil.AddItem(Ability);
+	}
+}
+
+reliable client function ClientRemoveSpecialAbility(SpecialAbilities Ability)
+{
+	SpecialAbil.RemoveItem(Ability);
+}
+/*
+	Special Abilities
+ ****************************************/
 
 // The player wants to fire.
 // Setup bFire/bAltFire so that Auto-Fire trait will work.
@@ -1052,15 +1590,11 @@ exec function StartFire(optional byte FireModeNum)
 	else if (FireModeNum==1)
 		bAltFire = 1;
 	else if (FireModeNum==4)
-	{	// test rocket jump
-		if (UseSpAbil == none)
-		{
-			UseSpAbil = SA_Grenade;
-		}
+	{
 		
 		if (Pawn != None)
 		{	
-			UseSpAbil();
+			AbilDelegate();
 			return;
 		}
 	}
@@ -1487,7 +2021,7 @@ function bool HasWeapon(class<KFWeapon> WPC)
 {
 	local Inventory Inv;
 
-	for (Inv = Pawn.InvManager.InventoryChain; Inv != None; Inv = Inv.Inventory)
+	for (Inv = EIM.InventoryChain; Inv != None; Inv = Inv.Inventory)
 	{
 		if (Inv.Class == WPC) return true;
 	}
@@ -1509,38 +2043,79 @@ function InitWeaponProperties()
 	}
 }
 
+reliable server function ServerSetWeaponMaxLevels()
+{
+	SetWeaponMaxLevels();
+}
+
+simulated function SetWeaponMaxLevels()
+{
+	`log("ExtPlayerController.SetWeaponMaxLevels called on " @ Role);
+	if (PlayerReplicationInfo != None)
+	{
+		class'Ext_WeaponProperties'.static.SetMaxLvs(PlayerReplicationInfo);
+		class'Ext_WeaponProp_HuskCannon'.static.SetMaxLvs(PlayerReplicationInfo);
+		`log("ExtPlayerController.SetWeaponMaxLevels called");
+	}
+}
+
+reliable server function ServerClearUpgradeStates()
+{
+	local int idx;
+	for (idx = 0; idx < 15; idx++)
+	{
+		WeaponUpgradeStates[idx].bHasData = false;
+	}
+}
+
+reliable server function ServerAddUpgradeState(class<KFWeapon> WPC)
+{
+	local int idx;
+
+	for (idx = 0; idx < 15; idx++)
+	{
+		if (!WeaponUpgradeStates[idx].bHasData) break;
+	}
+	if (idx < 15)
+	{
+		WeaponUpgradeStates[idx].bHasData = true;
+		WeaponUpgradeStates[idx].WeaponClass = WPC;
+		WeaponUpgradeStates[idx].DamageLv = 0;
+		WeaponUpgradeStates[idx].AoELv = 0;
+		WeaponUpgradeStates[idx].PenetrationLv = 0;
+		WeaponUpgradeStates[idx].DotLv = 0;
+	}
+	else
+	{
+		`log("ExtPlayerController.AddUpgradeState: No more upgrade slots available");
+	}
+}
+
+// reliable server function ServerCreateWeapProp(KFWeapon NewWeapon)
+// {
+// 	CreateWeapProp(NewWeapon);
+// }
+
 function CreateWeapProp(KFWeapon NewWeapon)
 {
 	local int idx;
 	local Ext_WeaponProperties WPP;
 
-	// Ensure max levels are set before creating weapon properties
-	if (PlayerReplicationInfo != None)
+	if (ClassIsChildOf(NewWeapon.class, class'KFWeap_HuskCannon'))
 	{
-		class'Ext_WeaponProperties'.static.SetMaxLvs(PlayerReplicationInfo);
-		class'Ext_WeaponProp_HuskCannon'.static.SetMaxLvs(PlayerReplicationInfo);
-		`log("ExtPlayerController.CreateWeapProp: SetMaxLvs called for " @ NewWeapon.Class);
-	}
-
-	if (FindWeaponProperties(NewWeapon.Class, idx))
-	{
-		InvProperties[idx].WeaponInstance = NewWeapon;
-		InvProperties[idx].ApplyModifiers();
+		WPP = new class'Ext_WeaponProp_HuskCannon';
 	}
 	else
 	{
-		if (ClassIsChildOf(NewWeapon.class, class'KFWeap_HuskCannon'))
-		{
-			WPP = new class'Ext_WeaponProp_HuskCannon';
-		}
-		else
-		{
-			WPP = new class'Ext_WeaponProperties';
-		}
-		WPP.PCInit(self, NewWeapon);
-		InvProperties.AddItem(WPP);
-		`log("ExtPlayerController.CreateWeapProp: Created new weapon properties for " @ NewWeapon.Class @ " MaxDmgLv=" @ WPP.default.MaxDmgLv);
+		WPP = new class'Ext_WeaponProperties';
 	}
+
+	WPP.PCInit(self, NewWeapon);
+	InvProperties.AddItem(WPP);
+	`log("ExtPlayerController.CreateWeapProp: Created new weapon properties for " @ NewWeapon.Class @ " MaxDmgLv=" @ WPP.default.MaxDmgLv);
+
+	if (Role == ROLE_Authority)
+		WeaponUpgradeStates[InvProperties.Length] = WPP.GetUpgradeState();
 }
 
 /***
@@ -1548,46 +2123,35 @@ function CreateWeapProp(KFWeapon NewWeapon)
  * add a weapon to the pawn and create an associated weapon properties
  * return true if the weapon is added, otherwise false
  */ 
-function bool AddWeapon(class<KFWeapon> WPC)
-{
-	
-	
-	local ExtHumanPawn ExtHP;
-	local KFWeapon SpawnedWeapon;
+// reliable client function bool AddWeapon(class<KFWeapon> WPC)
+// {
+// 	local KFWeapon SpawnedWeapon;
 
-	ExtHP = ExtHumanPawn(Pawn);
-	if (ExtHP == None) return false;
+// 	if (HasWeapon(WPC)) return false;
 
-	if (HasWeapon(WPC)) return false;
+// 	SpawnedWeapon = ServerAddWeapon(WPC);
+// 	if (SpawnedWeapon == None) return false;
 
-	SpawnedWeapon = ServerAddWeapon(WPC);
-	if (SpawnedWeapon == None) return false;
+// 	CreateWeapProp(SpawnedWeapon);
 
-	CreateWeapProp(SpawnedWeapon);
-
-	return true;
-}
+// 	return true;
+// }
 
 reliable server function KFWeapon ServerAddWeapon(class<KFWeapon> WPC)
 {
-    local ExtHumanPawn ExtHP;
     local KFWeapon SpawnedWeapon;
-    local KFInventoryManager KFIM;
 
-    ExtHP = ExtHumanPawn(Pawn);
-    if (ExtHP == None) return none;
+    if (EHP == None || EIM == None) return none;
 
     if (HasWeapon(WPC)) return none;
 
-    KFIM = KFInventoryManager(ExtHP.InvManager);
-    if (KFIM == None) return none;
-
-    SpawnedWeapon = KFWeapon(KFIM.CreateInventory(WPC));
+    SpawnedWeapon = KFWeapon(EIM.CreateInventory(WPC));
     
     // Create weapon properties on server side as well
     if (SpawnedWeapon != None)
     {
         CreateWeapProp(SpawnedWeapon);
+		ServerAddUpgradeState(WPC);
         `log("ExtPlayerController.ServerAddWeapon: Created weapon properties for " @ WPC @ " on server. InvProperties.Length=" @ InvProperties.Length);
     }
     
@@ -1597,16 +2161,8 @@ reliable server function KFWeapon ServerAddWeapon(class<KFWeapon> WPC)
 // Server function to purchase weapon and deduct dosh atomically
 reliable server function ServerPurchaseWeapon(class<KFWeapon> WPC, int Price)
 {
-    local ExtHumanPawn ExtHP;
     local KFWeapon SpawnedWeapon;
     local ExtPlayerReplicationInfo ExtPRI;
-    
-    ExtHP = ExtHumanPawn(Pawn);
-    if (ExtHP == None)
-    {
-        // `log("ExtPlayerController.ServerPurchaseWeapon: Failed - No pawn");
-        return;
-    }
     
     ExtPRI = ExtPlayerReplicationInfo(PlayerReplicationInfo);
     if (ExtPRI == None)
@@ -1639,17 +2195,29 @@ function DropWeapon(KFWeapon Weapon)
 {
 	local int Idx;
 
+	return;
+
 	for (Idx = 0; Idx < InvProperties.Length; Idx++)
 	{
 		if (InvProperties[Idx].WeaponInstance == Weapon)
 		{	
 			`log("ExtPlayerController.DropWeapon: Dropped weapon at index " @ Idx);
-			RemoveWeaponIdx(Idx, false, false);
+			RemoveWeaponIdx(Idx, false);
 		}
 	}
 }
 
-function RemoveWeaponIdx(int PropIdx, bool bDestroyWeapon, bool bRemoveProp)
+simulated function RemoveUpgradeState(int PropIdx)
+{
+	local int idx;
+
+	for (idx = PropIdx; idx < 14; idx++)
+	{
+		WeaponUpgradeStates[idx] = WeaponUpgradeStates[idx + 1];
+	}
+}
+
+simulated function RemoveWeaponIdx(int PropIdx, bool bDestroyWeapon = true)
 {
 	local KFInventoryManager KFIM;
 	KFIM = KFInventoryManager(Pawn.InvManager);
@@ -1661,31 +2229,21 @@ function RemoveWeaponIdx(int PropIdx, bool bDestroyWeapon, bool bRemoveProp)
 	if (bDestroyWeapon)
 		InvProperties[PropIdx].WeaponInstance.Destroy();
 
-	if (bRemoveProp)
-		InvProperties.Remove(PropIdx, 1);
-	else	
-		InvProperties[PropIdx].WeaponInstance = None;
-}
+	InvProperties.Remove(PropIdx, 1);
+	RemoveUpgradeState(PropIdx);
 
-function SellWeapon(int PropIdx)
-{
-	ServerSellWeapon(PropIdx);
-	RemoveWeaponIdx(PropIdx, true, true);
+	CheckPropAndUpgrades();
+
+	// if (Role == ROLE_Authority)
+	// 	ServerRecreateUpgradeStates();
 }
 
 // Server function to sell weapon and add dosh atomically
 reliable server function ServerSellWeapon(int PropIdx)
 {
-    local ExtHumanPawn ExtHP;
     local ExtPlayerReplicationInfo ExtPRI;
     local int SellPrice;
     local int ScoreBefore;
-    
-    ExtHP = ExtHumanPawn(Pawn);
-    if (ExtHP == None)
-    {
-        return;
-    }
     
     ExtPRI = ExtPlayerReplicationInfo(PlayerReplicationInfo);
     if (ExtPRI == None)
@@ -1709,30 +2267,13 @@ reliable server function ServerSellWeapon(int PropIdx)
     // Get sell price before removing
     SellPrice = InvProperties[PropIdx].GetSellPrice();
     ScoreBefore = ExtPRI.Score;
-    `log("ExtPlayerController.ServerSellWeapon: Before sell - Score=" @ ScoreBefore @ " SellPrice=" @ SellPrice);
+    // `log("ExtPlayerController.ServerSellWeapon: Before sell - Score=" @ ScoreBefore @ " SellPrice=" @ SellPrice);
     
     // Add dosh on server
     ExtPRI.AddDosh(SellPrice);
     `log("ExtPlayerController.ServerSellWeapon: After AddDosh - Score=" @ ExtPRI.Score @ " Expected: " @ (ScoreBefore + SellPrice));
-}
 
-function ApplyWeaponUpgrades()
-{
-	local int idx;
-
-	if (Role < ROLE_Authority)
-	{
-		ServerApplyWeaponUpgrades();
-		return;
-	}
-
-	for (idx = 0; idx < InvProperties.Length; idx++)
-	{
-		if (InvProperties[idx].WeaponInstance != None)
-			InvProperties[idx].ApplyModifiers();
-	}
-
-	ClientApplyWeaponUpgrades();
+	RemoveWeaponIdx(PropIdx, true);
 }
 
 function HandlePickup(Inventory Inv)
@@ -1779,6 +2320,7 @@ exec function SwitchTeam()
 defaultproperties
 {
 	SpecialAbil.Add(SpAbil_PerkGrenade)
+	AbilityGaugePerKill=0
 	
 	bCanRocketJump=false
 	InputClass=Class'ExtPlayerInput'
@@ -1788,6 +2330,8 @@ defaultproperties
 	MidGameMenuClass=class'UI_MidGameMenu'
 	PerkList.Empty()
 	PerkList.Add((PerkClass=Class'ExtPerkManager'))
+
+	bIsFiringHemoStrike=false
 
 	NVG_DOF_FocalDistance=3800.0
 	NVG_DOF_SharpRadius=2500.0

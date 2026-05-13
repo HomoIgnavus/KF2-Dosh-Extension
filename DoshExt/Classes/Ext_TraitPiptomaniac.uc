@@ -60,15 +60,15 @@ defaultproperties
 	SupportedPerk=class'Ext_PerkBerserker'
 	TraitGroup=class'Ext_TGroupBombzerker'
 	NumLevels=5
-	DefLevelCosts(0)=100
-	DefLevelCosts(1)=200
-	DefLevelCosts(2)=400
-	DefLevelCosts(3)=800
-	DefLevelCosts(4)=1600
+	DefLevelCosts(0)=50
+	DefLevelCosts(1)=100
+	DefLevelCosts(2)=200
+	DefLevelCosts(3)=300
+	DefLevelCosts(4)=400
 	
 	FallDamageScale(0)=1.5
 	FallDamageScale(1)=2.0
 	FallDamageScale(2)=3.0
 	FallDamageScale(3)=5.0
-	FallDamageScale(4)=100.0
+	FallDamageScale(4)=10.0
 }
