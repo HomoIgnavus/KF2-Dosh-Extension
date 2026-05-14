@@ -1383,6 +1383,9 @@ function SetSpAbil(SpecialAbilities SpAbil)
 		case SpAbil_RocketJump:
 			AbilDelegate = SA_RocketJump;
 			break;
+		case SpAbil_MysticEyes:
+			AbilDelegate = SA_MysticEyes;
+			break;
 		case SpAbil_HemoStrike:
 			AbilDelegate = SA_HemoStrike;
 			break;
@@ -1444,6 +1447,36 @@ function int SA_RocketJump()
 		Pawn.Velocity += vect(0.0f, 0.0f, 10000.0f);
 	}
 	return 1;
+}
+
+function int SA_MysticEyes()
+{
+	local Ext_PerkBerserker BerserkerPerk;
+	local KFPawn KFP;
+	local Inventory inv;
+	local ExtWeap_Knife_Berserker_Mystic mysticKnife;
+
+	`log("SA_MysticEyes() executed on " @ Role);
+
+	BerserkerPerk = Ext_PerkBerserker(ActivePerkManager.CurrentPerk);
+	if (BerserkerPerk == None) return 0;
+	if (!BerserkerPerk.bHasMysticEyes)
+		return 0;
+
+	KFP = KFPawn(Pawn);
+	if (KFP == None) return 0;
+	for (Inv = KFP.InvManager.InventoryChain; Inv != None; Inv = Inv.Inventory)
+	{
+		mysticKnife = ExtWeap_Knife_Berserker_Mystic(Inv);
+		if (mysticKnife != None)
+		{
+			mysticKnife.ActivateMysticEyes(
+				BerserkerPerk.MysticEyesDuration, BerserkerPerk.MysticEyesDmgMultiplier);
+			return 1;
+		}
+	}
+
+	return 0;
 }
 
 reliable server function ServerRocketJump()

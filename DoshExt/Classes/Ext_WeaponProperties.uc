@@ -469,7 +469,6 @@ static final operator(26) bool != ( Ext_WeaponProperties A, Ext_WeaponProperties
 
 defaultproperties
 {
-    MinLevel=3
     DamageLv=0
     PenetrationLv=0
     AoELv=0

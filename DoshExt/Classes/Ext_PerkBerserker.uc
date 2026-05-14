@@ -49,6 +49,11 @@ var GameExplosion FallExploTemplateNuke;
 var public float FallDamageScale;
 var public bool bIsAtomic; // won't die from fall damage
 
+// Special Ability
+var public bool bHasMysticEyes;
+var public float MysticEyesDuration;
+var public float MysticEyesDmgMultiplier;
+
 replication
 {
 	// Things the server should send to the client.
@@ -387,4 +392,8 @@ defaultproperties
 	FallDamageScale = 1.0;
 	bIsAtomic = false
 	bIsParryCoolingDown = false
+
+	bHasMysticEyes = false;
+	MysticEyesDuration = 0.0;
+	MysticEyesDmgMultiplier = 1.0;
 }

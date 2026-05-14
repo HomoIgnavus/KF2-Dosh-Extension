@@ -23,6 +23,7 @@ enum SpecialAbilities
 {
 	SpAbil_PerkGrenade,
 	SpAbil_RocketJump,
+	SpAbil_MysticEyes,
 	SpAbil_MGRs,
 	SpAbil_HemoStrike,
 	SpAbil_None,

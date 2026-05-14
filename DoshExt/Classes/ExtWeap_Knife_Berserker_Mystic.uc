@@ -8,11 +8,41 @@
 
 class ExtWeap_Knife_Berserker_Mystic extends KFWeap_Knife_Berserker;
 
-var private ExtMeleeHelper_Mystic HelperMystic;
+var private KFMeleeHelperWeapon HelperMystic;
+var private KFMeleeHelperWeapon MeleeHelperNormal;
+var private array<float> DamageNormal;
 
-simulated function ActivateMysticEyes()
+var private bool bIsMysticEyesActive;
+
+function ActivateMysticEyes(float Duration, float DmgMultiplier)
 {
+	local int idx;
+
+	if (bIsMysticEyesActive) return;
+
 	MeleeAttackHelper = HelperMystic;
+	
+	for (idx = 0; idx < InstantHitDamage.Length; idx++)
+	{
+		DamageNormal[idx] = InstantHitDamage[idx];
+		InstantHitDamage[idx] *= DmgMultiplier;
+	}
+	bIsMysticEyesActive = true;
+
+	SetTimer(Duration, false, 'DeactivateMysticEyes');
+}
+
+function DeactivateMysticEyes()
+{
+	local int idx;
+
+	MeleeAttackHelper = MeleeHelperNormal;
+	
+	for (idx = 0; idx < InstantHitDamage.Length; idx++)
+	{
+		InstantHitDamage[idx] = DamageNormal[idx];
+	}
+	bIsMysticEyesActive = false;
 }
 
 defaultproperties
@@ -34,8 +64,7 @@ defaultproperties
 	InstantHitDamageTypes(HEAVY_ATK_FIREMODE)=class'KFDT_Slashing_KnifeHeavy_Berserker'
 	InstantHitDamageTypes(BASH_FIREMODE)=class'KFDT_Piercing_KnifeStab_Berserker'
 
-	Begin Object Name=MeleeHelper_Mystic
-		class=ExtMeleeHelper_Mystic
+	Begin Object Class=ExtMeleeHelper_Mystic Name=MeleeHelper_Mystic
 		MaxHitRange=220
 		WorldImpactEffects=KFImpactEffectInfo'FX_Impacts_ARCH.Bladed_melee_impact'
 		// Override automatic hitbox creation (advanced)
@@ -54,4 +83,6 @@ defaultproperties
 		ChainSequence_R=(DIR_Left, DIR_ForwardRight, DIR_ForwardLeft, DIR_Right, DIR_Left)
 	End Object
 	HelperMystic=MeleeHelper_Mystic
+
+	MeleeHelperNormal=MeleeHelper_0
 }

@@ -16,8 +16,10 @@
 // You should have received a copy of the GNU General Public License along
 // with Server Extension. If not, see <https://www.gnu.org/licenses/>.
 
-// Armor now consumes falling damage
 Class Ext_TraitSA_MysticEyes extends Ext_TraitSA_Base;
+
+var float Duration[3];
+var float DmgMultiplier[3];
 
 static function AddDefaultInventory(KFPawn Player, Ext_PerkBase Perk, byte Level, optional Ext_TraitDataStore Data)
 {
@@ -38,6 +40,14 @@ static function AddDefaultInventory(KFPawn Player, Ext_PerkBase Perk, byte Level
 static function ApplyEffectOn(ExtHumanPawn Player, Ext_PerkBase Perk, byte Level, optional Ext_TraitDataStore Data)
 {
 	local Inventory Inv;
+	local Ext_PerkBerserker BerserkerPerk;
+
+	BerserkerPerk = Ext_PerkBerserker(Perk);
+	if (BerserkerPerk == None) return;
+
+	BerserkerPerk.bHasMysticEyes = true;
+	BerserkerPerk.MysticEyesDuration = Default.Duration[Level-1];
+	BerserkerPerk.MysticEyesDmgMultiplier = Default.DmgMultiplier[Level-1];
 
 	Inv = Player.FindInventoryType(class'KFWeap_Knife_Berserker');
 	if (Inv!=None)
@@ -49,13 +59,38 @@ static function ApplyEffectOn(ExtHumanPawn Player, Ext_PerkBase Perk, byte Level
 		if (KFWeapon(Inv)!=None)
 			KFWeapon(Inv).bGivenAtStart = true;
 	}
+	AddAbility(Player, SpAbil_MysticEyes);
+}
+
+static function CancelEffectOn(ExtHumanPawn Player, Ext_PerkBase Perk, byte Level, optional Ext_TraitDataStore Data)
+{
+	local Inventory Inv;
+	local Ext_PerkBerserker BerserkerPerk;
+
+	BerserkerPerk = Ext_PerkBerserker(Perk);
+	if (BerserkerPerk == None) return;
+
+	BerserkerPerk.bHasMysticEyes = false;
+	BerserkerPerk.MysticEyesDuration = 0.0;
+	BerserkerPerk.MysticEyesDmgMultiplier = 1.0;
+
+	RemoveAbility(Player, SpAbil_MysticEyes);
 }
 
 defaultproperties
 {
 	SupportedPerk=class'Ext_PerkBerserker'
 	NumLevels=3
+
 	DefLevelCosts(0)=100
 	DefLevelCosts(0)=200
 	DefLevelCosts(0)=400
+
+	Duration[0]=2
+	Duration[1]=3
+	Duration[2]=4
+
+	DmgMultiplier[0]=1.2
+	DmgMultiplier[1]=1.4
+	DmgMultiplier[2]=1.6
 }
