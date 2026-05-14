@@ -23,6 +23,33 @@ Class Ext_PerkBase extends Info
 	Config(DoshExt)
 	DependsOn(ExtWebAdmin_UI);
 
+enum Ext_StatType
+{
+	ExtStat_Speed,
+	ExtStat_Damage,
+	ExtStat_Recoil,
+	ExtStat_Spread,
+	ExtStat_FireRate,
+	ExtStat_MeleeSpeed,
+	ExtStat_Reload,
+	ExtStat_Health,
+	ExtStat_KnockDown,
+	ExtStat_Welder,
+	ExtStat_Heal,
+	ExtStat_Mag,
+	ExtStat_Spare,
+	ExtStat_OffDamage,
+	ExtStat_SelfDamage,
+	ExtStat_Armor,
+	ExtStat_PoisonDmg,
+	ExtStat_SonicDmg,
+	ExtStat_FireDmg,
+	ExtStat_AllDmg,
+	ExtStat_HeadDamage,
+	ExtStat_HealRecharge,
+	ExtStat_Switch,
+};
+
 var array<FWebAdminConfigInfo> WebConfigs;
 
 var ExtPerkManager PerkManager;
@@ -112,6 +139,7 @@ var localized string StatDamage;
 var localized string StatRecoil;
 var localized string StatSpread;
 var localized string StatRate;
+var localized string StatMeleeSpeed;
 var localized string StatReload;
 var localized string StatHealth;
 var localized string StatKnockDown;
@@ -139,6 +167,7 @@ reliable client simulated function string UIName(FDefPerkStat DefPerkStat)
 		case name("Recoil"):	   return StatRecoil;
 		case name("Spread"):	   return StatSpread;
 		case name("Rate"):		 return StatRate;
+		case name("MeleeSpeed"):	return StatMeleeSpeed;
 		case name("Reload"):	   return StatReload;
 		case name("Health"):	   return StatHealth;
 		case name("KnockDown"):	return StatKnockDown;
@@ -1181,32 +1210,6 @@ simulated function PlayerDied()
 	}
 }
 
-enum Ext_StatType
-{
-	ExtStat_Speed,
-	ExtStat_Damage,
-	ExtStat_Recoil,
-	ExtStat_Spread,
-	ExtStat_FireRate,
-	ExtStat_MeleeSpeed,
-	ExtStat_Reload,
-	ExtStat_Health,
-	ExtStat_KnockDown,
-	ExtStat_Welder,
-	ExtStat_Heal,
-	ExtStat_Mag,
-	ExtStat_Spare,
-	ExtStat_OffDamage,
-	ExtStat_SelfDamage,
-	ExtStat_Armor,
-	ExtStat_PoisonDmg,
-	ExtStat_SonicDmg,
-	ExtStat_FireDmg,
-	ExtStat_AllDmg,
-	ExtStat_HeadDamage,
-	ExtStat_HealRecharge,
-	ExtStat_Switch,
-};
 // Stat modifier functions.
 simulated function float ApplyEffect(name Type, float Value, float Progress)
 {
@@ -1231,11 +1234,14 @@ simulated function float ApplyEffect(name Type, float Value, float Progress)
 	case 'Rate':
 		Modifiers[ExtStat_FireRate] = 1.f / (1.f+Value*Progress);
 		break;
+	case 'MeleeSpeed':
+		Modifiers[ExtStat_MeleeSpeed] = 1.f / (1.f + Value*Progress);
+		break;
 	case 'Reload':
-		Modifiers[5] = 1.f / (1.f+Value*Progress);
+		Modifiers[ExtStat_Reload] = 1.f / (1.f+Value*Progress);
 		break;
 	case 'Health':
-		Modifiers[6] = 1.f + (Value*Progress);
+		Modifiers[ExtStat_Health] = 1.f + (Value*Progress);
 		if (bActivePerk && PlayerOwner.Pawn!=None)
 		{
 			PlayerOwner.Pawn.HealthMax = PlayerOwner.Pawn.Default.Health;
@@ -1243,32 +1249,32 @@ simulated function float ApplyEffect(name Type, float Value, float Progress)
 		}
 		break;
 	case 'KnockDown':
-		Modifiers[7] = 1.f + (Value*Progress);
+		Modifiers[ExtStat_KnockDown] = 1.f + (Value*Progress);
 		break;
 	case 'Welder':
-		Modifiers[8] = 1.f + (Value*Progress);
+		Modifiers[ExtStat_Welder] = 1.f + (Value*Progress);
 		break;
 	case 'Heal':
-		Modifiers[9] = 1.f + (Value*Progress);
+		Modifiers[ExtStat_Heal] = 1.f + (Value*Progress);
 		break;
 	case 'Mag':
-		Modifiers[10] = 1.f + (Value*Progress);
+		Modifiers[ExtStat_Mag] = 1.f + (Value*Progress);
 		if (bActivePerk && WorldInfo.NetMode!=NM_Client && PlayerOwner.Pawn!=None && PlayerOwner.Pawn.InvManager!=None)
 			UpdateAmmoStatus(PlayerOwner.Pawn.InvManager);
 		break;
 	case 'Spare':
-		Modifiers[11] = 1.f + (Value*Progress);
+		Modifiers[ExtStat_Spare] = 1.f + (Value*Progress);
 		if (bActivePerk && WorldInfo.NetMode!=NM_Client && PlayerOwner.Pawn!=None && PlayerOwner.Pawn.InvManager!=None)
 			UpdateAmmoStatus(PlayerOwner.Pawn.InvManager);
 		break;
 	case 'OffDamage':
-		Modifiers[12] = 1.f + (Value*Progress);
+		Modifiers[ExtStat_OffDamage] = 1.f + (Value*Progress);
 		break;
 	case 'SelfDamage':
-		Modifiers[13] = 1.f / (1.f+Value*Progress);
+		Modifiers[ExtStat_SelfDamage] = 1.f / (1.f+Value*Progress);
 		break;
 	case 'Armor':
-		Modifiers[14] = (Value*Progress*100.f);
+		Modifiers[ExtStat_Armor] = (Value*Progress*100.f);
 		// if (bActivePerk && ExtHumanPawn(PlayerOwner.Pawn)!=None)
 		if (bActivePerk && ExtHumanPawn(PlayerOwner.Pawn)!=None)
 		{
@@ -1282,25 +1288,25 @@ simulated function float ApplyEffect(name Type, float Value, float Progress)
 		}
 		return Value*Progress;
 	case 'PoisonDmg':
-		Modifiers[15] = 1.f / (1.f+Value*Progress);
+		Modifiers[ExtStat_PoisonDmg] = 1.f / (1.f+Value*Progress);
 		break;
 	case 'SonicDmg':
-		Modifiers[16] = 1.f / (1.f+Value*Progress);
+		Modifiers[ExtStat_SonicDmg] = 1.f / (1.f+Value*Progress);
 		break;
 	case 'FireDmg':
-		Modifiers[17] = 1.f / (1.f+Value*Progress);
+		Modifiers[ExtStat_FireDmg] = 1.f / (1.f+Value*Progress);
 		break;
 	case 'AllDmg':
-		Modifiers[18] = 1.f / (1.f+Value*Progress);
+		Modifiers[ExtStat_AllDmg] = 1.f / (1.f+Value*Progress);
 		break;
 	case 'HeadDamage':
-		Modifiers[19] = Value*Progress;
+		Modifiers[ExtStat_HeadDamage] = Value*Progress;
 		break;
 	case 'HealRecharge':
-		Modifiers[20] = 1.f / (1.f+Value*Progress);
+		Modifiers[ExtStat_HealRecharge] = 1.f / (1.f+Value*Progress);
 		break;
 	case 'Switch':
-		Modifiers[21] = 1.f / (1.f+Value*Progress);
+		Modifiers[ExtStat_Switch] = 1.f / (1.f+Value*Progress);
 		break;
 	}
 	return (Value*Progress);
@@ -1311,12 +1317,12 @@ simulated function ModifyDamageGiven(out int InDamage, optional Actor DamageCaus
 	if (BasePerk==None || (DamageType!=None && DamageType.Default.ModifierPerkList.Find(BasePerk)>=0) || (KFWeapon(DamageCauser)!=None && IsWeaponOnPerk(KFWeapon(DamageCauser))))
 	{
 		if (HitZoneIdx == 0)
-			InDamage *= (Modifiers[ExtStat_Damage] + Modifiers[19]);
+			InDamage *= (Modifiers[ExtStat_Damage] + Modifiers[ExtStat_HeadDamage]);
 		else
 			InDamage *= Modifiers[ExtStat_Damage];
 	}
 	else if (DamageType==None || DamageType.Name!='KFDT_SuicideExplosive')
-		InDamage *= Modifiers[12];
+		InDamage *= Modifiers[ExtStat_OffDamage];
 }
 
 simulated function ModifyDamageTaken(out int InDamage, optional class<DamageType> DamageType, optional Controller InstigatedBy)
@@ -1324,15 +1330,15 @@ simulated function ModifyDamageTaken(out int InDamage, optional class<DamageType
 	if (InDamage>0)
 	{
 		if ((InstigatedBy==None || InstigatedBy==PlayerOwner) && class<KFDamageType>(DamageType)!=None)
-			InDamage *= Modifiers[13];
-		else if (Modifiers[15]<1 && class<KFDT_Toxic>(DamageType)!=None)
-			InDamage = Max(InDamage*Modifiers[15],1); // Do at least 1 damage.
-		else if (Modifiers[16]<1 && class<KFDT_Sonic>(DamageType)!=None)
-			InDamage = Max(InDamage*Modifiers[16],1);
-		else if (Modifiers[17]<1 && class<KFDT_Fire>(DamageType)!=None)
-			InDamage = Max(InDamage*Modifiers[17],1);
-		if (Modifiers[18]<1 && InstigatedBy!=None && InstigatedBy!=PlayerOwner)
-			InDamage = Max(InDamage*Modifiers[18],1);
+			InDamage *= Modifiers[ExtStat_SelfDamage];
+		else if (Modifiers[ExtStat_PoisonDmg]<1 && class<KFDT_Toxic>(DamageType)!=None)
+			InDamage = Max(InDamage*Modifiers[ExtStat_PoisonDmg],1); // Do at least 1 damage.
+		else if (Modifiers[ExtStat_SonicDmg]<1 && class<KFDT_Sonic>(DamageType)!=None)
+			InDamage = Max(InDamage*Modifiers[ExtStat_SonicDmg],1);
+		else if (Modifiers[ExtStat_FireDmg]<1 && class<KFDT_Fire>(DamageType)!=None)
+			InDamage = Max(InDamage*Modifiers[ExtStat_FireDmg],1);
+		if (Modifiers[ExtStat_AllDmg]<1 && InstigatedBy!=None && InstigatedBy!=PlayerOwner)
+			InDamage = Max(InDamage*Modifiers[ExtStat_AllDmg],1);
 	}
 }
 
@@ -1355,7 +1361,7 @@ simulated function ModifyRateOfFire(out float InRate, KFWeapon KFW)
 
 simulated function float GetReloadRateScale(KFWeapon KFW)
 {
-	return (IsWeaponOnPerk(KFW) ? Modifiers[5] : 1.f);
+	return (IsWeaponOnPerk(KFW) ? Modifiers[ExtStat_Reload] : 1.f);
 }
 
 simulated function float GetCameraViewShakeModifier(KFWeapon KFW)
@@ -1365,33 +1371,35 @@ simulated function float GetCameraViewShakeModifier(KFWeapon KFW)
 
 function ModifyHealth(out int InHealth)
 {
-	InHealth *= Modifiers[6];
+	InHealth *= Modifiers[ExtStat_Health];
 }
 
 function ModifyArmor(out int MaxArmor)
 {
-	// MaxArmor = Min(MaxArmor+Modifiers[14],255);
-	MaxArmor = MaxArmor + Modifiers[14];
-	`log("Ext_PerkBase.ModifyArmor() Modifiers[14] = " @ Modifiers[14]);
+	MaxArmor = MaxArmor + Modifiers[ExtStat_Armor];
+	`log("Ext_PerkBase.ModifyArmor() Modifiers[ExtStat_Armor] = " @ Modifiers[ExtStat_Armor]);
 	`log("Ext_PerkBase.ModifyArmor() MaxArmor = " @ MaxArmor);
 }
 
 function float GetKnockdownPowerModifier()
 {
-	return Modifiers[7];
+	return Modifiers[ExtStat_KnockDown];
 }
 
 function float GetStunPowerModifier(optional class<DamageType> DamageType, optional byte HitZoneIdx)
 {
-	return Modifiers[7];
+	return Modifiers[ExtStat_KnockDown];
 }
 
 function float GetStumblePowerModifier( optional KFPawn KFP, optional class<KFDamageType> DamageType, optional out float CooldownModifier, optional byte BodyPart )
 {
-	return Modifiers[7];
+	return Modifiers[ExtStat_KnockDown];
 }
 
-simulated function ModifyMeleeAttackSpeed(out float InDuration);
+simulated function ModifyMeleeAttackSpeed(out float InDuration)
+{
+	InDuration *= Modifiers[ExtStat_MeleeSpeed];
+}
 
 function AddDefaultInventory(KFPawn P)
 {
@@ -1401,7 +1409,7 @@ function AddDefaultInventory(KFPawn P)
 		P.DefaultInventory.AddItem(PrimaryWeapon);
 	P.DefaultInventory.AddItem(PrimaryMelee);
 	if (KFInventoryManager(P.InvManager)!=None)
-		KFInventoryManager(P.InvManager).MaxCarryBlocks = KFInventoryManager(P.InvManager).Default.MaxCarryBlocks+Modifiers[10];
+		KFInventoryManager(P.InvManager).MaxCarryBlocks = KFInventoryManager(P.InvManager).Default.MaxCarryBlocks+Modifiers[ExtStat_Mag];
 
 	for (i=0; i<PerkTraits.Length; ++i)
 	{
@@ -1412,8 +1420,8 @@ function AddDefaultInventory(KFPawn P)
 
 simulated function ModifyWeldingRate(out float FastenRate, out float UnfastenRate)
 {
-	FastenRate *= Modifiers[8];
-	UnfastenRate *= Modifiers[8];
+	FastenRate *= Modifiers[ExtStat_Welder];
+	UnfastenRate *= Modifiers[ExtStat_Welder];
 }
 
 function bool RepairArmor(Pawn HealTarget)
@@ -1423,20 +1431,20 @@ function bool RepairArmor(Pawn HealTarget)
 
 function bool ModifyHealAmount(out float HealAmount)
 {
-	HealAmount*=Modifiers[9];
+	HealAmount*=Modifiers[ExtStat_Heal];
 	return false;
 }
 
 simulated function ModifyMagSizeAndNumber(KFWeapon KFW, out int MagazineCapacity, optional array< Class<KFPerk> > WeaponPerkClass, optional bool bSecondary=false, optional name WeaponClassname)
 {
 	if (MagazineCapacity>2 && (KFW==None ? WeaponPerkClass.Find(BasePerk)>=0 : IsWeaponOnPerk(KFW))) // Skip boomstick for this.
-		MagazineCapacity = MagazineCapacity*Modifiers[10];
+		MagazineCapacity = MagazineCapacity*Modifiers[ExtStat_Mag];
 }
 
 simulated function ModifySpareAmmoAmount(KFWeapon KFW, out int PrimarySpareAmmo, optional const out STraderItem TraderItem, optional bool bSecondary)
 {
 	if (KFW==None ? TraderItem.AssociatedPerkClasses.Find(BasePerk)>=0 : IsWeaponOnPerk(KFW))
-		PrimarySpareAmmo*=Modifiers[11];
+		PrimarySpareAmmo*=Modifiers[ExtStat_Spare];
 }
 
 simulated function bool ShouldMagSizeModifySpareAmmo(KFWeapon KFW, optional Class<KFPerk> WeaponPerkClass)
@@ -1457,7 +1465,7 @@ final function UpdateAmmoStatus(InventoryManager Inv)
 
 simulated function ModifyHealerRechargeTime(out float RechargeRate)
 {
-	RechargeRate *= Modifiers[20];
+	RechargeRate *= Modifiers[ExtStat_HealRecharge];
 }
 
 simulated function DrawSpecialPerkHUD(Canvas C)
@@ -1518,7 +1526,7 @@ function PlayerKilled(KFPawn_Monster Victim, class<DamageType> DamageType);
 
 function ModifyBloatBileDoT(out float DoTScaler)
 {
-	DoTScaler = Modifiers[15];
+	DoTScaler = Modifiers[ExtStat_PoisonDmg];
 }
 
 simulated function bool GetIsUberAmmoActive(KFWeapon KFW)
@@ -1547,7 +1555,7 @@ simulated function float GetIronSightSpeedModifier(KFWeapon KFW)
 
 simulated function ModifyWeaponSwitchTime(out float ModifiedSwitchTime)
 {
-	ModifiedSwitchTime *= Modifiers[21];
+	ModifiedSwitchTime *= Modifiers[ExtStat_Switch];
 }
 
 function OnWaveEnded();
@@ -1617,28 +1625,29 @@ defaultproperties
 	WebConfigs.Add((PropType=0,PropName="PrestigeXPReduce",UIName="Prestige XP Reduce",UIDesc="Percent amount of XP cost is reduced for each prestige (1.0 = 1/2, or 50 % of XP)"))
 	// WebConfigs.Add((PropType=0,PropName="MinimalDataLevel",UIName="Minimal Real Level",UIDesc="Minimal level for new players or who loads from saves"))
 
-	DefPerkStats(0)=(MaxValue=50,CostPerValue=1,StatType="Speed",Progress=0.4)
-	DefPerkStats(1)=(MaxValue=1000,CostPerValue=1,StatType="Damage",Progress=0.5)
-	DefPerkStats(2)=(MaxValue=100,CostPerValue=1,StatType="Recoil",Progress=1)
-	DefPerkStats(3)=(MaxValue=100,CostPerValue=1,StatType="Spread",Progress=1)
-	DefPerkStats(4)=(MaxValue=1000,CostPerValue=1,StatType="Rate",Progress=0.5)
-	DefPerkStats(5)=(MaxValue=1000,CostPerValue=1,StatType="Reload",Progress=0.5)
-	DefPerkStats(6)=(MaxValue=150,CostPerValue=1,StatType="Health",Progress=1)
-	DefPerkStats(7)=(MaxValue=100,CostPerValue=1,StatType="KnockDown",Progress=1)
-	DefPerkStats(8)=(MaxValue=200,CostPerValue=1,StatType="Welder",bHiddenConfig=true,Progress=0.5)
-	DefPerkStats(9)=(MaxValue=400,CostPerValue=1,StatType="Heal",bHiddenConfig=true,Progress=0.5)
-	DefPerkStats(10)=(MaxValue=400,CostPerValue=1,StatType="Mag",Progress=1)
-	DefPerkStats(11)=(MaxValue=500,CostPerValue=1,StatType="Spare",Progress=1)
-	DefPerkStats(12)=(MaxValue=1000,CostPerValue=1,StatType="OffDamage",Progress=0.25)
-	DefPerkStats(13)=(MaxValue=1000,CostPerValue=1,StatType="SelfDamage",Progress=1,bHiddenConfig=true)
-	DefPerkStats(14)=(MaxValue=150,CostPerValue=1,StatType="Armor",Progress=1)
-	DefPerkStats(15)=(MaxValue=1000,CostPerValue=1,StatType="PoisonDmg",Progress=1.5,bHiddenConfig=true)
-	DefPerkStats(16)=(MaxValue=1000,CostPerValue=1,StatType="SonicDmg",Progress=1.5,bHiddenConfig=true)
-	DefPerkStats(17)=(MaxValue=1000,CostPerValue=1,StatType="FireDmg",Progress=1.5,bHiddenConfig=true)
-	DefPerkStats(18)=(MaxValue=500,CostPerValue=1,StatType="AllDmg",Progress=0.25)
-	DefPerkStats(19)=(MaxValue=500,CostPerValue=1,StatType="HeadDamage",Progress=1,bHiddenConfig=true)
-	DefPerkStats(20)=(MaxValue=200,CostPerValue=1,StatType="HealRecharge",Progress=0.5,bHiddenConfig=true)
-	DefPerkStats(21)=(MaxValue=100,CostPerValue=1,StatType="Switch",Progress=1)
+	DefPerkStats.Add((MaxValue=50,CostPerValue=1,StatType="Speed",Progress=0.4))
+	DefPerkStats.Add((MaxValue=1000,CostPerValue=1,StatType="Damage",Progress=0.5))
+	DefPerkStats.Add((MaxValue=100,CostPerValue=1,StatType="Recoil",Progress=1))
+	DefPerkStats.Add((MaxValue=100,CostPerValue=1,StatType="Spread",Progress=1))
+	DefPerkStats.Add((MaxValue=1000,CostPerValue=1,StatType="Rate",Progress=0.5))
+	DefPerkStats.Add((MaxValue=1000,CostPerValue=1,StatType="MeleeSpeed",Progress=0.5))
+	DefPerkStats.Add((MaxValue=1000,CostPerValue=1,StatType="Reload",Progress=0.5))
+	DefPerkStats.Add((MaxValue=150,CostPerValue=1,StatType="Health",Progress=1))
+	DefPerkStats.Add((MaxValue=100,CostPerValue=1,StatType="KnockDown",Progress=1))
+	DefPerkStats.Add((MaxValue=200,CostPerValue=1,StatType="Welder",bHiddenConfig=true,Progress=0.5))
+	DefPerkStats.Add((MaxValue=400,CostPerValue=1,StatType="Heal",bHiddenConfig=true,Progress=0.5))
+	DefPerkStats.Add((MaxValue=400,CostPerValue=1,StatType="Mag",Progress=1))
+	DefPerkStats.Add((MaxValue=500,CostPerValue=1,StatType="Spare",Progress=1))
+	DefPerkStats.Add((MaxValue=1000,CostPerValue=1,StatType="OffDamage",Progress=0.25))
+	DefPerkStats.Add((MaxValue=1000,CostPerValue=1,StatType="SelfDamage",Progress=1,bHiddenConfig=true))
+	DefPerkStats.Add((MaxValue=150,CostPerValue=1,StatType="Armor",Progress=1))
+	DefPerkStats.Add((MaxValue=1000,CostPerValue=1,StatType="PoisonDmg",Progress=1.5,bHiddenConfig=true))
+	DefPerkStats.Add((MaxValue=1000,CostPerValue=1,StatType="SonicDmg",Progress=1.5,bHiddenConfig=true))
+	DefPerkStats.Add((MaxValue=1000,CostPerValue=1,StatType="FireDmg",Progress=1.5,bHiddenConfig=true))
+	DefPerkStats.Add((MaxValue=500,CostPerValue=1,StatType="AllDmg",Progress=0.25))
+	DefPerkStats.Add((MaxValue=500,CostPerValue=1,StatType="HeadDamage",Progress=1,bHiddenConfig=true))
+	DefPerkStats.Add((MaxValue=200,CostPerValue=1,StatType="HealRecharge",Progress=0.5,bHiddenConfig=true))
+	DefPerkStats.Add((MaxValue=100,CostPerValue=1,StatType="Switch",Progress=1))
 
 	Modifiers.Add(1.f)
 	Modifiers.Add(1.f)

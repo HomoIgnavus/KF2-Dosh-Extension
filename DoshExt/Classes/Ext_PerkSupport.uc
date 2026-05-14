@@ -30,7 +30,7 @@ replication
 
 simulated function bool GetUsingTactialReload(KFWeapon KFW)
 {
-	return (IsWeaponOnPerk(KFW) ? Modifiers[5]<0.75 : false);
+	return (IsWeaponOnPerk(KFW) ? Modifiers[ExtStat_Reload]<0.75 : false);
 }
 
 simulated function bool CanRepairDoors()
@@ -67,8 +67,8 @@ defaultproperties
 	BasePerk=class'KFPerk_Support'
 	WeldExpUpNum=80
 
-	DefPerkStats(0)=(MaxValue=20,CostPerValue=2)
-	DefPerkStats(8)=(bHiddenConfig=false)
+	// DefPerkStats(0)=(MaxValue=20,CostPerValue=2)
+	// DefPerkStats(8)=(bHiddenConfig=false)
 
 	PrimaryMelee=class'KFWeap_Knife_Support'
 	PrimaryWeapon=class'KFWeap_Shotgun_MB500'

@@ -30,7 +30,7 @@ replication
 
 simulated function bool GetUsingTactialReload(KFWeapon KFW)
 {
-	return (IsWeaponOnPerk(KFW) ? Modifiers[5]<0.65 : false);
+	return (IsWeaponOnPerk(KFW) ? Modifiers[ExtStat_Reload]<0.65 : false);
 }
 
 simulated function ModifyDamageGiven(out int InDamage, optional Actor DamageCauser, optional KFPawn_Monster MyKFPM, optional KFPlayerController DamageInstigator, optional class<KFDamageType> DamageType, optional int HitZoneIdx)

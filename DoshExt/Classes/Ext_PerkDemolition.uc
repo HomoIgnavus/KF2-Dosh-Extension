@@ -36,7 +36,7 @@ simulated function float GetAoERadiusModifier()
 
 simulated function bool GetUsingTactialReload(KFWeapon KFW)
 {
-	return (IsWeaponOnPerk(KFW) ? Modifiers[5]<0.85 : false);
+	return (IsWeaponOnPerk(KFW) ? Modifiers[ExtStat_Reload]<0.85 : false);
 }
 
 simulated function float ApplyEffect(name Type, float Value, float Progress)
@@ -48,7 +48,7 @@ simulated function float ApplyEffect(name Type, float Value, float Progress)
 	MyPRI = KFPlayerReplicationInfo(PlayerOwner.PlayerReplicationInfo);
 
 	if (MyPRI != None && Type == 'KnockDown')
-		MyPRI.bConcussiveActive = Modifiers[7] > 1.5;
+		MyPRI.bConcussiveActive = Modifiers[ExtStat_KnockDown] > 1.5;
 
 	return DefValue;
 }
@@ -86,7 +86,7 @@ function bool IsCriticalHitZone(KFPawn TestPawn, int HitZoneIndex)
 simulated function ModifySpareAmmoAmount(KFWeapon KFW, out int PrimarySpareAmmo, optional const out STraderItem TraderItem, optional bool bSecondary)
 {
 	if (KFW != None && KFWeap_Thrown_C4(KFW) != None)
-		PrimarySpareAmmo += (1 + Modifiers[11]);
+		PrimarySpareAmmo += (1 + Modifiers[ExtStat_Spare]);
 
 	Super.ModifySpareAmmoAmount(KFW, PrimarySpareAmmo, TraderItem, bSecondary);
 }
@@ -120,6 +120,6 @@ defaultproperties
 
 	AutoBuyLoadOutPath=(class'KFWeapDef_HX25', class'KFWeapDef_M79', class'KFWeapDef_M16M203', class'KFWeapDef_RPG7')
 
-	DefPerkStats(10)=(bHiddenConfig=true) // No support for mag size on demo.
-	DefPerkStats(13)=(bHiddenConfig=false) // Self damage.
+	// DefPerkStats(10)=(bHiddenConfig=true) // No support for mag size on demo.
+	// DefPerkStats(13)=(bHiddenConfig=false) // Self damage.
 }

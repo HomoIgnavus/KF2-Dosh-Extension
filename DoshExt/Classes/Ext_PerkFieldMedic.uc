@@ -56,7 +56,7 @@ simulated function ModifyDamageGiven(out int InDamage, optional Actor DamageCaus
 simulated function ModifyMagSizeAndNumber(KFWeapon KFW, out int MagazineCapacity, optional array< Class<KFPerk> > WeaponPerkClass, optional bool bSecondary=false, optional name WeaponClassname)
 {
 	if (MagazineCapacity>2 && (KFW==None ? WeaponPerkClass.Find(BasePerk)>=0 : IsWeaponOnPerk(KFW))) // Skip boomstick for this.
-		MagazineCapacity = MagazineCapacity*Modifiers[10];
+		MagazineCapacity = MagazineCapacity*Modifiers[ExtStat_Mag];
 }
 
 function bool RepairArmor(Pawn HealTarget)
@@ -77,7 +77,7 @@ function bool RepairArmor(Pawn HealTarget)
 
 function bool ModifyHealAmount(out float HealAmount)
 {
-	HealAmount*=Modifiers[9];
+	HealAmount*=Modifiers[ExtStat_Heal];
 	return (RepairArmorRate>0);
 }
 
@@ -288,12 +288,12 @@ defaultproperties
 	MaxHealingShield=30
 	HealingShieldDuration=5.0f
 
-	DefPerkStats(0)=(MaxValue=70)
-	DefPerkStats(9)=(bHiddenConfig=false) // Heal efficiency
-	DefPerkStats(15)=(bHiddenConfig=false) // Toxic resistance
-	DefPerkStats(16)=(bHiddenConfig=false) // Sonic resistance
-	DefPerkStats(17)=(bHiddenConfig=false) // Fire resistance
-	DefPerkStats(20)=(bHiddenConfig=false) // Heal recharge
+	// DefPerkStats(0)=(MaxValue=70)
+	// DefPerkStats(9)=(bHiddenConfig=false) // Heal efficiency
+	// DefPerkStats(15)=(bHiddenConfig=false) // Toxic resistance
+	// DefPerkStats(16)=(bHiddenConfig=false) // Sonic resistance
+	// DefPerkStats(17)=(bHiddenConfig=false) // Fire resistance
+	// DefPerkStats(20)=(bHiddenConfig=false) // Heal recharge
 
 	PrimaryMelee=class'KFWeap_Knife_FieldMedic'
 	// PrimaryMelee=class'ExtWeap_Knife_FieldMedicRapid'

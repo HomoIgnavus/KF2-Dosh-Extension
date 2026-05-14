@@ -29,7 +29,7 @@ replication
 
 simulated function bool GetUsingTactialReload(KFWeapon KFW)
 {
-	return (IsWeaponOnPerk(KFW) ? Modifiers[5]<0.8 : false);
+	return (IsWeaponOnPerk(KFW) ? Modifiers[ExtStat_Reload]<0.8 : false);
 }
 
 simulated function bool GetIsUberAmmoActive(KFWeapon KFW)

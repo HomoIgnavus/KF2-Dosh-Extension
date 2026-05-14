@@ -50,10 +50,10 @@ function float GetStumblePowerModifier( optional KFPawn KFP, optional class<KFDa
 {
 	if (bRapidAssault)
 	{
-		return 2.f * Modifiers[7];
+		return 2.f * Modifiers[ExtStat_KnockDown];
 	}
 
-	return Modifiers[7];
+	return Modifiers[ExtStat_KnockDown];
 }
 
 defaultproperties

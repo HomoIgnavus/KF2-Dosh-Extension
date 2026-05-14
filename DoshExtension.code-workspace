@@ -1,13 +1,16 @@
 {
 	"folders": [
 		{
+			"name": "DoshExtension",
 			"path": "."
 		},
 		{
-			"path": "../../../programs/Steam/steamapps/common/killingfloor2/Development/Src"
+			"name": "KF2-Configurable-Game-Mode",
+			"path": "../../vscode/KF2-Configurable-Game-Mode"
 		},
 		{
-			"path": "../../vscode/KF2-Configurable-Game-Mode"
+			"name": "Src",
+			"path": "../../../programs/Steam/steamapps/common/killingfloor2/Development/Src"
 		}
 	],
 	"settings": {

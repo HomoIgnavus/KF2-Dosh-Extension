@@ -56,9 +56,16 @@ replication
 		ZedTimeMeleeAtkRate;
 }
 
+simulated function ModifyDamageGiven(out int InDamage, optional Actor DamageCauser, optional KFPawn_Monster MyKFPM, optional KFPlayerController DamageInstigator, optional class<KFDamageType> DamageType, optional int HitZoneIdx)
+{
+	super.ModifyDamageGiven(InDamage, DamageCauser, MyKFPM, DamageInstigator, DamageType, HitZoneIdx);
+
+	`log("Ext_PerkBerserker::ModifyDamageGiven() HitZoneIdx="$ HitZoneIdx);
+}
+
 simulated function ModifyMeleeAttackSpeed(out float InDuration)
 {
-	InDuration *= Modifiers[ExtStat_Spread];
+	InDuration *= Modifiers[ExtStat_MeleeSpeed];
 	if (ZedTimeMeleeAtkRate<1.f && WorldInfo.TimeDilation<1.f)
 		InDuration *= ZedTimeMeleeAtkRate;
 }
@@ -277,6 +284,7 @@ defaultproperties
 	DefTraitList.Add(class'Ext_TraitBombzerker')
 	DefTraitList.Add(class'Ext_TraitPiptomaniac')
 	DefTraitList.Add(class'Ext_TraitAtomic')
+	DefTraitList.Add(class'Ext_TraitSA_MysticEyes')
 	DefTraitList.Add(class'Ext_TraitVampire')
 	DefTraitList.Add(class'Ext_TraitParryMaster')
 	DefTraitList.Add(class'Ext_TraitParryHealing')
@@ -284,7 +292,7 @@ defaultproperties
 	DefTraitList.Add(class'Ext_TraitParryProjectile')
 	DefTraitList.Add(class'Ext_TraitSpartan')
 	DefTraitList.Add(class'Ext_TraitAirbagArmor')
-	DefPerkStats(15)=(bHiddenConfig=false) // Poison damage.
+	// DefPerkStats(15)=(bHiddenConfig=false) // Poison damage.
 	BasePerk=class'KFPerk_Berserker'
 
 	PrimaryMelee=class'KFWeap_Knife_Berserker'
