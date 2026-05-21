@@ -61,12 +61,13 @@ replication
 		ZedTimeMeleeAtkRate;
 }
 
-simulated function ModifyDamageGiven(out int InDamage, optional Actor DamageCauser, optional KFPawn_Monster MyKFPM, optional KFPlayerController DamageInstigator, optional class<KFDamageType> DamageType, optional int HitZoneIdx)
-{
-	super.ModifyDamageGiven(InDamage, DamageCauser, MyKFPM, DamageInstigator, DamageType, HitZoneIdx);
+// Mystic Eyes debug
+// simulated function ModifyDamageGiven(out int InDamage, optional Actor DamageCauser, optional KFPawn_Monster MyKFPM, optional KFPlayerController DamageInstigator, optional class<KFDamageType> DamageType, optional int HitZoneIdx)
+// {
+// 	super.ModifyDamageGiven(InDamage, DamageCauser, MyKFPM, DamageInstigator, DamageType, HitZoneIdx);
 
-	`log("Ext_PerkBerserker::ModifyDamageGiven() HitZoneIdx="$ HitZoneIdx);
-}
+// 	`log("Ext_PerkBerserker::ModifyDamageGiven() HitZoneIdx="$ HitZoneIdx);
+// }
 
 simulated function ModifyMeleeAttackSpeed(out float InDuration)
 {

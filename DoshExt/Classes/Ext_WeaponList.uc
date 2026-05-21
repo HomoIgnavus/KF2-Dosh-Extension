@@ -116,4 +116,5 @@ function bool GetWeaponInfo(class<KFWeapon> WPC, out WeaponInfo WPI)
 defaultproperties
 {
     BuiltInWeapons.Add(class'ExtWeapDef_Knife_MedicRapid')
+    BuiltInWeapons.Add(class'ExtWeapDef_Knife_Berserker_Mystic')
 }

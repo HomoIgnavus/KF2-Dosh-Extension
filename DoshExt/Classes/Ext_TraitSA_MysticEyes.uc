@@ -86,9 +86,9 @@ defaultproperties
 	DefLevelCosts(0)=200
 	DefLevelCosts(0)=400
 
-	Duration[0]=2
-	Duration[1]=3
-	Duration[2]=4
+	Duration[0]=10
+	Duration[1]=20
+	Duration[2]=30
 
 	DmgMultiplier[0]=1.2
 	DmgMultiplier[1]=1.4

@@ -8,11 +8,33 @@
 
 class ExtWeap_Knife_Berserker_Mystic extends KFWeap_Knife_Berserker;
 
-var private KFMeleeHelperWeapon HelperMystic;
-var private KFMeleeHelperWeapon MeleeHelperNormal;
 var private array<float> DamageNormal;
+var private ExtMeleeHelper_Mystic HelperMystic;
 
 var private bool bIsMysticEyesActive;
+
+simulated function PostBeginPlay()
+{
+	super.PostBeginPlay();
+	HelperMystic = ExtMeleeHelper_Mystic(MeleeAttackHelper);
+	if (HelperMystic == None) 
+	{
+		`log("HelperMystic is None");
+	}
+}
+
+simulated event SetWeapon()
+{
+	if ( WorldInfo.NetMode != NM_DedicatedServer )
+	{
+		// Forcefully apply custom materials to the mesh slots
+		// We do this before super.SetWeapon() so the blood MICs use these as parents
+		Mesh.SetMaterial(0, MaterialInstanceConstant'WEP_3P_MysticBlade_MAT.WEP_3P_BerserkerKnife_MIC');
+		Mesh.SetMaterial(1, MaterialInstanceConstant'WEP_3P_MysticBlade_MAT.WEP_3P_BerserkerKnife_MIC');
+	}
+
+	super.SetWeapon();
+}
 
 function ActivateMysticEyes(float Duration, float DmgMultiplier)
 {
@@ -20,51 +42,36 @@ function ActivateMysticEyes(float Duration, float DmgMultiplier)
 
 	if (bIsMysticEyesActive) return;
 
-	MeleeAttackHelper = HelperMystic;
-	
 	for (idx = 0; idx < InstantHitDamage.Length; idx++)
 	{
 		DamageNormal[idx] = InstantHitDamage[idx];
 		InstantHitDamage[idx] *= DmgMultiplier;
 	}
+	HelperMystic.SetHeadHitOnly(True);
 	bIsMysticEyesActive = true;
 
 	SetTimer(Duration, false, 'DeactivateMysticEyes');
+	// `log("Mystic Eyes activated!");
 }
 
 function DeactivateMysticEyes()
 {
 	local int idx;
 
-	MeleeAttackHelper = MeleeHelperNormal;
-	
 	for (idx = 0; idx < InstantHitDamage.Length; idx++)
 	{
 		InstantHitDamage[idx] = DamageNormal[idx];
 	}
+	HelperMystic.SetHeadHitOnly(false);
 	bIsMysticEyesActive = false;
+	// `log("Mystic Eyes deactivated!");
 }
 
 defaultproperties
 {
-	// Content
-	PackageKey="BerserkerKnife"
-	FirstPersonMeshName="WEP_1P_BerserkerKnife_MESH.Wep_1stP_BerserkerKnife_Rig"
-	AttachmentArchetypeName="WEP_BerserkerKnife_ARCH.Wep_Knife_3P"
-
-	Begin Object Name=FirstPersonMesh
-		AnimSets(0)=AnimSet'WEP_1P_CommandoKnife_ANIM.Wep_1stP_CommKnife_Anim'
-	End Object
-	
-	// Inventory
-	AssociatedPerkClasses(0)=class'KFPerk_Berserker'
-	WeaponSelectTexture=Texture2D'ui_weaponselect_tex.UI_WeaponSelect_BerserkerKnife'
-
-	InstantHitDamageTypes(DEFAULT_FIREMODE)=class'KFDT_Slashing_Knife_Berserker'
-	InstantHitDamageTypes(HEAVY_ATK_FIREMODE)=class'KFDT_Slashing_KnifeHeavy_Berserker'
-	InstantHitDamageTypes(BASH_FIREMODE)=class'KFDT_Piercing_KnifeStab_Berserker'
-
-	Begin Object Class=ExtMeleeHelper_Mystic Name=MeleeHelper_Mystic
+	Begin Object Class=ExtMeleeHelper_Mystic Name=MeleeHelper_0
+		bUseDirectionalMelee=true
+		bHasChainAttacks=true
 		MaxHitRange=220
 		WorldImpactEffects=KFImpactEffectInfo'FX_Impacts_ARCH.Bladed_melee_impact'
 		// Override automatic hitbox creation (advanced)
@@ -82,7 +89,12 @@ defaultproperties
 		ChainSequence_L=(DIR_Right, DIR_ForwardLeft, DIR_ForwardRight, DIR_Left, DIR_Right)
 		ChainSequence_R=(DIR_Left, DIR_ForwardRight, DIR_ForwardLeft, DIR_Right, DIR_Left)
 	End Object
-	HelperMystic=MeleeHelper_Mystic
+	MeleeAttackHelper=MeleeHelper_0
+	
+	// NumBloodMapMaterials=2
 
-	MeleeHelperNormal=MeleeHelper_0
+	Begin Object Name=FirstPersonMesh
+        Materials(0)=MaterialInstanceConstant'WEP_1P_MysticBlade_MAT.Wep_1stP_BerserkerKnife_MIC'
+        Materials(1)=MaterialInstanceConstant'WEP_1P_MysticBlade_MAT.Wep_1stP_BerserkerKnife_MIC'
+    End Object
 }

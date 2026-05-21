@@ -220,7 +220,8 @@ reliable server function ServerRecreateWeaponProperties()
 					KFW.Class != class'KFWeap_Welder' &&
 					KFW.Class != class'KFWeap_Healer_Syringe'
 				) ||
-				KFW.Class == class'ExtWeap_Knife_FieldMedicRapid'
+				KFW.Class == class'ExtWeap_Knife_FieldMedicRapid' ||
+				KFW.Class == class'ExtWeap_Knife_Berserker_Mystic'
 			)
 		)
 		{
@@ -1449,6 +1450,12 @@ function int SA_RocketJump()
 	return 1;
 }
 
+
+reliable server function Server_Activate_MysticEyes()
+{
+	SA_MysticEyes();
+}
+
 function int SA_MysticEyes()
 {
 	local Ext_PerkBerserker BerserkerPerk;
@@ -1456,7 +1463,15 @@ function int SA_MysticEyes()
 	local Inventory inv;
 	local ExtWeap_Knife_Berserker_Mystic mysticKnife;
 
-	`log("SA_MysticEyes() executed on " @ Role);
+	if (!ConsumeAbilityPoints())
+		return 0;
+	
+	if (Role < ROLE_Authority)
+	{
+		Server_Activate_MysticEyes();
+	}
+
+	// `log("SA_MysticEyes() executed on " @ Role);
 
 	BerserkerPerk = Ext_PerkBerserker(ActivePerkManager.CurrentPerk);
 	if (BerserkerPerk == None) return 0;
