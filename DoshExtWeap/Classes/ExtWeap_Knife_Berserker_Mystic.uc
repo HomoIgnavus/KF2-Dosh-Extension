@@ -45,7 +45,7 @@ unreliable client function SetMysticMaterial()
 unreliable client function SetDefaultMaterial()
 {
 	// MaterialInstanceConstant'wep_1p_berserkerknife_mat.Wep_1stP_BerserkerKnife_MIC'
-	Mesh.SetMaterial(0, MaterialInstanceConstant'wep_1p_berserkerknife_mat.Wep_1stP_BerserkerKnife_MIC');
+	Mesh.SetMaterial(0, MaterialInstanceConstant'WEP_1P_BerserkerKnife_MAT.Wep_1stP_BerserkerKnife_MIC');
 }
 
 function ActivateMysticEyes(float Duration, float DmgMultiplier)

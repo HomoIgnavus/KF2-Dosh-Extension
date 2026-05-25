@@ -5,7 +5,7 @@
 			"path": "."
 		},
 		{
-			"path": "../../Program Files (x86)/Steam/steamapps/common/killingfloor2/Development/Src"
+			"path": "../../../programs/Steam/steamapps/common/killingfloor2/Development/Src"
 		}
 	],
 	"settings": {
