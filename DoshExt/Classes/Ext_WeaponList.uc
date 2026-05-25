@@ -103,6 +103,19 @@ function bool GetWeaponInfo(class<KFWeapon> WPC, out WeaponInfo WPI)
     return false; // Changed from return None; to return None;
 }
 
+function bool IsUpgradable(class<KFWeapon> WPC)
+{
+    local int i;
+    for (i = 0; i < WeapInfos.Length; i++)
+    {
+        if (WeapInfos[i].WeaponClass == WPC)
+        {
+            return true;
+        }
+    }
+    return false; // Changed from return None; to return None;
+}
+
 // function class<KFWeaponDefinition> GetWeaponDef(class<KFWeapon> WPC)
 // {
 //     local int i;

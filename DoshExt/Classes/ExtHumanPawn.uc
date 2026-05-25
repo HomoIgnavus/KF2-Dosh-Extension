@@ -46,6 +46,7 @@ var public float ArmorEfficiency;
 var public float AirBagRate; // for berserker's Ext_TraitAirbagArmor
 
 // special abilities
+var private bool bIsUsingAbility;
 var public int AbilityGauge;
 var public int AbilityCount;
 var public int MaxAbilityCount;
@@ -1736,12 +1737,30 @@ reliable client function ClientAbilityUpdated(int NewGauge, int NewCount)
 {
     AbilityGauge = NewGauge;
     AbilityCount = NewCount;
-	`log("ClientAbilityUpdated(): AbilityGauge: " @ AbilityGauge @ " AbilityCount: " @ AbilityCount @ " MaxAbilityCount: " @ MaxAbilityCount);
+	// `log("ClientAbilityUpdated(): AbilityGauge: " @ AbilityGauge @ " AbilityCount: " @ AbilityCount @ " MaxAbilityCount: " @ MaxAbilityCount);
 }
 
+function SetAbilityDuration(float duration)
+{
+	OnAbilityStart();
+	ClearTimer(nameOf(OnAbilityEnd));
+	SetTimer(Duration, false, nameOf(OnAbilityEnd));
+}
+
+function OnAbilityStart()
+{
+	bIsUsingAbility = true;
+}
+
+function OnAbilityEnd()
+{
+	bIsUsingAbility = false;
+}
 
 function AddAbilityGauge(int AP)
 {
+	if (bIsUsingAbility) return;
+
 	AbilityGauge += AP;
 
 	// assuming that AbilityGauge won't be >= 200
@@ -1761,7 +1780,7 @@ function AddAbilityGauge(int AP)
     {
         ClientAbilityUpdated(AbilityGauge, AbilityCount);
     }
-	`log("AddAbilityGauge(): AbilityGauge: " @ AbilityGauge @ " AbilityCount: " @ AbilityCount @ " MaxAbilityCount: " @ MaxAbilityCount);
+	// `log("AddAbilityGauge(): AbilityGauge: " @ AbilityGauge @ " AbilityCount: " @ AbilityCount @ " MaxAbilityCount: " @ MaxAbilityCount);
 }
 
 simulated function StartFire(byte FireModeNum)

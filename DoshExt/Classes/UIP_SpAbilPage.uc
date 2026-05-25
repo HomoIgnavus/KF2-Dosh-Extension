@@ -10,11 +10,12 @@ var int SelectedIdx; // The "Selected Sp Weapon" variable
 
 var localized string ColumnWeaponText;
 var localized string ColumnDescriptionText;
-var localized string SpAbil_PerkGrenade;
-var localized string SpAbil_RocketJump;
-var localized string SpAbil_MGRs;
-var localized string SpAbil_HemoStrike;
-var localized string SpAbil_Unknown;
+var localized string AbilName_PerkGrenade;
+var localized string AbilName_RocketJump;
+var localized string AbilName_MGRs;
+var localized string AbilName_HemoStrike;
+var localized string AbilName_MysticEyes;
+var localized string AbilName_Unknown;
 
 function InitMenu()
 {
@@ -143,15 +144,17 @@ function string GetSpecialAbilityName(SpecialAbilities Ability)
     switch (Ability)
     {
         case SpAbil_PerkGrenade:
-            return SpAbil_PerkGrenade;
+            return AbilName_PerkGrenade;
         case SpAbil_RocketJump:
-            return SpAbil_RocketJump;
+            return AbilName_RocketJump;
         case SpAbil_MGRs:
-            return SpAbil_MGRs;
+            return AbilName_MGRs;
         case SpAbil_HemoStrike:
-            return SpAbil_HemoStrike;
+            return AbilName_HemoStrike;
+        case SpAbil_MysticEyes:
+            return AbilName_MysticEyes;
         default:
-            return SpAbil_Unknown;
+            return AbilName_Unknown;
     }
 }
 
@@ -199,15 +202,15 @@ function GetAbilityText(SpecialAbilities Ability, out string Name, out string De
     switch (Ability)
     {
         case SpAbil_PerkGrenade:
-            Name = SpAbil_PerkGrenade;
+            Name = AbilName_PerkGrenade;
             Description = "Toss a grenade with the same effects as your perk's grenade";
             break;
         case SpAbil_RocketJump:
-            Name = SpAbil_RocketJump;
+            Name = AbilName_RocketJump;
             Description = class'Ext_TraitSA_RocketJump'.default.Description;
             break;
         case SpAbil_MGRs:
-            Name = SpAbil_MGRs;
+            Name = AbilName_MGRs;
             Description = class'Ext_TraitSA_MGRs'.default.Description;
             break;
         default:

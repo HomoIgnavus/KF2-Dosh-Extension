@@ -1,3 +1,5 @@
 *.psd
 /ignore
 .*/
+*.code-workspace
+logs/

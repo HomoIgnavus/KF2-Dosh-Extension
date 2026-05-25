@@ -23,17 +23,29 @@ simulated function PostBeginPlay()
 	}
 }
 
-simulated event SetWeapon()
-{
-	if ( WorldInfo.NetMode != NM_DedicatedServer )
-	{
-		// Forcefully apply custom materials to the mesh slots
-		// We do this before super.SetWeapon() so the blood MICs use these as parents
-		Mesh.SetMaterial(0, MaterialInstanceConstant'WEP_3P_MysticBlade_MAT.WEP_3P_BerserkerKnife_MIC');
-		Mesh.SetMaterial(1, MaterialInstanceConstant'WEP_3P_MysticBlade_MAT.WEP_3P_BerserkerKnife_MIC');
-	}
+// simulated event SetWeapon()
+// {
+// 	if ( WorldInfo.NetMode != NM_DedicatedServer )
+// 	{
+// 		// Forcefully apply custom materials to the mesh slots
+// 		// We do this before super.SetWeapon() so the blood MICs use these as parents
+// 		Mesh.SetMaterial(0, MaterialInstanceConstant'WEP_3P_MysticBlade_MAT.WEP_3P_BerserkerKnife_MIC');
+// 		Mesh.SetMaterial(1, MaterialInstanceConstant'WEP_3P_MysticBlade_MAT.WEP_3P_BerserkerKnife_MIC');
+// 	}
 
-	super.SetWeapon();
+// 	super.SetWeapon();
+// }
+
+unreliable client function SetMysticMaterial()
+{
+	Mesh.SetMaterial(0, MaterialInstanceConstant'WEP_1P_MysticBlade_MAT.Wep_1stP_BerserkerKnife_MIC');
+	// Mesh.SetMaterial(1, MaterialInstanceConstant'WEP_3P_MysticBlade_MAT.WEP_3P_BerserkerKnife_MIC');
+}
+
+unreliable client function SetDefaultMaterial()
+{
+	// MaterialInstanceConstant'wep_1p_berserkerknife_mat.Wep_1stP_BerserkerKnife_MIC'
+	Mesh.SetMaterial(0, MaterialInstanceConstant'wep_1p_berserkerknife_mat.Wep_1stP_BerserkerKnife_MIC');
 }
 
 function ActivateMysticEyes(float Duration, float DmgMultiplier)
@@ -49,6 +61,7 @@ function ActivateMysticEyes(float Duration, float DmgMultiplier)
 	}
 	HelperMystic.SetHeadHitOnly(True);
 	bIsMysticEyesActive = true;
+	SetMysticMaterial();
 
 	SetTimer(Duration, false, 'DeactivateMysticEyes');
 	// `log("Mystic Eyes activated!");
@@ -64,6 +77,7 @@ function DeactivateMysticEyes()
 	}
 	HelperMystic.SetHeadHitOnly(false);
 	bIsMysticEyesActive = false;
+	SetDefaultMaterial();
 	// `log("Mystic Eyes deactivated!");
 }
 
@@ -93,8 +107,8 @@ defaultproperties
 	
 	// NumBloodMapMaterials=2
 
-	Begin Object Name=FirstPersonMesh
-        Materials(0)=MaterialInstanceConstant'WEP_1P_MysticBlade_MAT.Wep_1stP_BerserkerKnife_MIC'
-        Materials(1)=MaterialInstanceConstant'WEP_1P_MysticBlade_MAT.Wep_1stP_BerserkerKnife_MIC'
-    End Object
+	// Begin Object Name=FirstPersonMesh
+    //     Materials(0)=MaterialInstanceConstant'WEP_1P_MysticBlade_MAT.Wep_1stP_BerserkerKnife_MIC'
+    //     // Materials(1)=MaterialInstanceConstant'WEP_1P_MysticBlade_MAT.Wep_1stP_BerserkerKnife_MIC'
+    // End Object
 }

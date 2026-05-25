@@ -211,18 +211,19 @@ reliable server function ServerRecreateWeaponProperties()
 	{
 		KFW = KFWeapon(Inv);
 		if (
-			KFW != None && 
-			(
-				(
-					!ClassIsChildOf(KFW.Class, class'KFweapDef_Knife_Base') &&
-					KFW.Class != class'ExtWeap_Pistol_9mm' && 
-					KFW.Class != class'ExtWeap_Pistol_MedicS' && 
-					KFW.Class != class'KFWeap_Welder' &&
-					KFW.Class != class'KFWeap_Healer_Syringe'
-				) ||
-				KFW.Class == class'ExtWeap_Knife_FieldMedicRapid' ||
-				KFW.Class == class'ExtWeap_Knife_Berserker_Mystic'
-			)
+			KFW != None && WeaponList.IsUpgradable(KFW.Class)
+			// KFW != None && 
+			// (
+			// 	(
+			// 		!ClassIsChildOf(KFW.Class, class'KFweapDef_Knife_Base') &&
+			// 		KFW.Class != class'ExtWeap_Pistol_9mm' && 
+			// 		KFW.Class != class'ExtWeap_Pistol_MedicS' && 
+			// 		KFW.Class != class'KFWeap_Welder' &&
+			// 		KFW.Class != class'KFWeap_Healer_Syringe'
+			// 	) ||
+			// 	KFW.Class == class'ExtWeap_Knife_FieldMedicRapid' ||
+			// 	KFW.Class == class'ExtWeap_Knife_Berserker_Mystic'
+			// )
 		)
 		{
 			WPP = new class'Ext_WeaponProperties';
@@ -1487,6 +1488,7 @@ function int SA_MysticEyes()
 		{
 			mysticKnife.ActivateMysticEyes(
 				BerserkerPerk.MysticEyesDuration, BerserkerPerk.MysticEyesDmgMultiplier);
+			EHP.SetAbilityDuration(BerserkerPerk.MysticEyesDuration);
 			return 1;
 		}
 	}
@@ -1587,6 +1589,7 @@ reliable server function Timer_FireHemoStrikeMissles()
 	else
 	{
 		bIsFiringHemoStrike = false;
+		EHP.OnAbilityEnd();
 	}
 }
 
@@ -1600,6 +1603,7 @@ reliable server function int LaunchHemoStrike()
 
 	PrepareHemoStrike();
 	SetTimer(0.1, false, 'Timer_FireHemoStrikeMissles');
+	EHP.OnAbilityStart();
 	`log("LaunchHemoStrike: firing HemoStrike");
 	bIsFiringHemoStrike = true;
 	return 1;
