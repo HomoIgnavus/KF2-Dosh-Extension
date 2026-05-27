@@ -346,7 +346,6 @@ event PostRender()
 
 public function DrawMGRsBackground()
 {
-	local float CenterX, CenterY;
 	local float Radius;
 	local int NumSegments;
 	local int i;

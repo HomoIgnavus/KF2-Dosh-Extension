@@ -15,6 +15,7 @@ var localized string AbilName_RocketJump;
 var localized string AbilName_MGRs;
 var localized string AbilName_HemoStrike;
 var localized string AbilName_MysticEyes;
+var localized string AbilName_QuantumShield;
 var localized string AbilName_Unknown;
 
 function InitMenu()
@@ -153,6 +154,8 @@ function string GetSpecialAbilityName(SpecialAbilities Ability)
             return AbilName_HemoStrike;
         case SpAbil_MysticEyes:
             return AbilName_MysticEyes;
+        case SpAbil_QuantumShield:
+            return AbilName_QuantumShield;
         default:
             return AbilName_Unknown;
     }
@@ -196,25 +199,29 @@ function DrawMenu()
     Canvas.DrawText(AbilDescription);
 }
 
-function GetAbilityText(SpecialAbilities Ability, out string Name, out string Description)
+function GetAbilityText(SpecialAbilities Ability, out string AbilName, out string Description)
 {
     // `log("UIP_SpAbilPage.GetAbilityText: " @ Ability);
     switch (Ability)
     {
         case SpAbil_PerkGrenade:
-            Name = AbilName_PerkGrenade;
-            Description = "Toss a grenade with the same effects as your perk's grenade";
+            AbilName = AbilName_PerkGrenade;
+            Description = "Toss your perk's grenade";
             break;
         case SpAbil_RocketJump:
-            Name = AbilName_RocketJump;
+            AbilName = AbilName_RocketJump;
             Description = class'Ext_TraitSA_RocketJump'.default.Description;
             break;
         case SpAbil_MGRs:
-            Name = AbilName_MGRs;
+            AbilName = AbilName_MGRs;
             Description = class'Ext_TraitSA_MGRs'.default.Description;
             break;
+        case SpAbil_QuantumShield:
+            AbilName = AbilName_QuantumShield;
+            Description = class'Ext_TraitSA_QuantumShield'.default.Description;
+            break;
         default:
-            Name = "No ability selected.";
+            AbilName = "No ability selected.";
             Description = "";
             break;
     }

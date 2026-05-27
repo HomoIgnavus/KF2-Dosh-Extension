@@ -51,6 +51,9 @@ var private int HemoStrikeMissilePerShot;
 var private float HemoStrikeInterval;
 var private bool bIsFiringHemoStrike;
 
+// quantum shield
+var KFGameExplosion QuantumShieldExploTemplate;
+
 struct FAdminCmdType
 {
 	var string Cmd,Info;
@@ -1397,6 +1400,9 @@ function SetSpAbil(SpecialAbilities SpAbil)
 		case SpAbil_MGRs:
 			AbilDelegate = SA_MGRsReload;
 			break;
+		case SpAbil_QuantumShield:
+			AbilDelegate = SA_QuantumShield;
+			break;
 		default:
 			break;
 	}
@@ -1612,8 +1618,102 @@ reliable server function int LaunchHemoStrike()
 
 function int SA_HemoStrike()
 {
-	return LaunchHemoStrike();
+return LaunchHemoStrike();
 }
+
+function int SA_QuantumShield()
+{
+	EHP = ExtHumanPawn(Pawn);
+	if (EHP == None || EHP.ArmorInt <= 0) return 0;
+	if (EHP.bOwnsQuantumShield) return 0;
+
+	GiveQuantumShields(EHP.QuantumShieldDuration, EHP.QuantumShieldDmgMultiplier);
+
+	return 1;
+}
+
+reliable server function GiveQuantumShields(float Duration, int Mult)
+{
+	local ExtHumanPawn TeamPawn;
+	local ExtPlayerController TeammatePC;
+
+	EHP = ExtHumanPawn(Pawn);
+	if (EHP == None || EHP.ArmorInt <= 0) return;
+
+	EHP.bOwnsQuantumShield = true;
+	EHP.QuantumShieldMultiplier = Mult;
+	EHP.QuantumShieldArmorConsumed = 0;
+
+	foreach WorldInfo.AllControllers(class'ExtPlayerController', TeammatePC)
+	{
+		TeamPawn = ExtHumanPawn(TeammatePC.Pawn);
+		if (TeamPawn != None && TeamPawn.IsAliveAndWell() && TeamPawn.GetTeamNum() == 0)
+		{
+			TeamPawn.ReceiveQuantumShield(EHP, Duration, Mult);
+		}
+	}
+
+	SetTimer(Duration, false, 'OnQuantumShieldExpired');
+}
+
+function OnQuantumShieldExpired()
+{
+	DetonateAllQuantumShields();
+}
+
+function OnQuantumShieldDstroyed()
+{
+	// `log("OnQuantumShieldDstroyed(): detonate all quantum shields!");
+	ClearTimer('OnQuantumShieldExpired');
+	DetonateAllQuantumShields();
+}
+
+reliable server function DetonateAllQuantumShields()
+{
+	local ExtHumanPawn ShieldRecipient;
+	local ExtHumanPawn ShieldOwner;
+
+	if (Role < ROLE_Authority) return;
+
+	ShieldOwner = ExtHumanPawn(Pawn);
+	if (ShieldOwner == None || !ShieldOwner.bOwnsQuantumShield) return;
+
+	ShieldOwner.bOwnsQuantumShield = false;
+
+	foreach WorldInfo.AllPawns(class'ExtHumanPawn', ShieldRecipient)
+	{
+		if (ShieldRecipient.IsAliveAndWell() && ShieldRecipient.QuantumShieldOwner == ShieldOwner)
+		{
+			DetonateQuantumShield(ShieldRecipient, ShieldRecipient.QuantumShieldArmorConsumed, ShieldRecipient.QuantumShieldMultiplier);
+			ShieldRecipient.DeactivateQuantumShield();
+		}
+	}
+	
+	ShieldOwner.QuantumShieldArmorConsumed = 0;
+}
+
+simulated function DetonateQuantumShield(Actor Target, int ArmorConsumed, int Mult)
+{
+	local vector HitLocation;
+	local KFExplosionActorReplicated ExploActor;
+
+	if (Role == ROLE_Authority)
+	{
+		HitLocation = Target.Location;
+
+		QuantumShieldExploTemplate.Damage = Max(ArmorConsumed * Mult, 1);
+
+		ExploActor = Spawn(class'KFExplosionActorReplicated', self,, HitLocation, rotator(vect(0,0,1)),, true);
+		if (ExploActor != None)
+		{
+			ExploActor.InstigatorController = self;
+			ExploActor.Instigator = Pawn;
+			ExploActor.bIgnoreInstigator = true;
+			ExploActor.Explode(QuantumShieldExploTemplate);
+		}
+	}
+}
+
 /*
 	Medic
  ********************/
@@ -2377,6 +2477,49 @@ defaultproperties
 	PerkList.Add((PerkClass=Class'ExtPerkManager'))
 
 	bIsFiringHemoStrike=false
+
+	Begin Object Class=PointLightComponent Name=QuantumShieldExploPointLight
+		LightColor=(R=252,G=218,B=171,A=255)
+		Brightness=4.f
+		Radius=2000.f
+		FalloffExponent=10.f
+		CastShadows=False
+		CastStaticShadows=FALSE
+		CastDynamicShadows=False
+		bEnabled=FALSE
+		LightingChannels=(Indoor=TRUE,Outdoor=TRUE,bInitialized=TRUE)
+	End Object
+
+	Begin Object Class=KFGameExplosion Name=QuantumShieldExploTemplate0
+		Damage=125
+		DamageRadius=700
+		DamageFalloffExponent=2.f
+		DamageDelay=0.f
+
+		// Damage Effects
+		MyDamageType=class'KFDT_Explosive_FlashBangGrenade'
+		KnockDownStrength=0
+		FractureMeshRadius=200.0
+		FracturePartVel=500.0
+		ExplosionEffects=KFImpactEffectInfo'WEP_M84_ARCH.M84_Explosion'
+		ExplosionSound=AkEvent'WW_WEP_EXP_Grenade_Frag.Play_WEP_Flashbang'
+
+		// Dynamic Light
+		ExploLight=QuantumShieldExploPointLight
+		ExploLightStartFadeOutTime=0.0
+		ExploLightFadeOutTime=0.2
+
+		// Camera Shake
+		CamShake=CameraShake'FX_CameraShake_Arch.Grenades.Default_Grenade'
+		CamShakeInnerRadius=200
+		CamShakeOuterRadius=900
+		CamShakeFalloff=1.5f
+		bOrientCameraShakeTowardsEpicenter=true
+
+		bIgnoreInstigator=true
+		ActorClassToIgnoreForDamage=class'KFPawn_Human'
+	End Object
+	QuantumShieldExploTemplate=QuantumShieldExploTemplate0
 
 	NVG_DOF_FocalDistance=3800.0
 	NVG_DOF_SharpRadius=2500.0

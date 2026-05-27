@@ -58,11 +58,21 @@ var public int MGRs_BasePenetration;
 var public int MGRs_PenetrationMod;
 var public int MGRs_CurrentAmmo;
 
+// for quantum shield owner
+var bool bOwnsQuantumShield;
+var float QuantumShieldDuration;
+var float QuantumShieldDmgMultiplier;
+var public int QuantumShieldArmorConsumed;
+var int QuantumShieldMultiplier;
+var ParticleSystemComponent QuantumShieldPSC;
+var ParticleSystem QuantumShieldFX;
+// for quantum shield recipients
+var repnotify ExtHumanPawn QuantumShieldOwner;
 
 replication
 {
 	if (true)
-		bFeigningDeath,RepRegenHP,BackpackWeaponClass,ArmorInt,MaxArmorInt,bIsUsingMGRs,AbilityGauge,AbilityCount,MaxAbilityCount;
+		bFeigningDeath,RepRegenHP,BackpackWeaponClass,ArmorInt,MaxArmorInt,bIsUsingMGRs,AbilityGauge,AbilityCount,MaxAbilityCount,QuantumShieldOwner,QuantumShieldDuration,QuantumShieldDmgMultiplier;
 	if (bNetOwner)
 		bHasBunnyHop;
 	if (bNetDirty)
@@ -110,7 +120,6 @@ function ShieldAbsorb( out int InDamage )
 	local int AbsorbedDmg;
 
 	AbsorbedDmg = Min(Round(ArmorEfficiency * InDamage), ArmorInt);
-	`log("ExtHumanPawn.ShieldAbsorb() ArmorEfficiency = " @ ArmorEfficiency @ " InDamage = " @ InDamage @ " AbsorbedDmg = " @ AbsorbedDmg);
 	// reduce damage and armor
 	ArmorInt -= AbsorbedDmg;
 	InDamage -= AbsorbedDmg;
@@ -150,6 +159,16 @@ function AdjustDamage(out int InDamage, out vector Momentum, Controller Instigat
 
 	TempDamage *= GetHealingShieldModifier();
 	InDamage = Round( TempDamage );
+
+	// quantum shield damage absorption
+	if (InDamage > 0 && QuantumShieldOwner != None && QuantumShieldOwner.ArmorInt > 0)
+	{
+		QuantumShieldAbsorb(InDamage);
+		if (InDamage <= 0)
+		{
+			AddHitFX(InDamage, InstigatedBy, GetHitZoneIndex(HitInfo.BoneName), HitLocation, Momentum, class<KFDamageType>(DamageType));
+		}
+	}
 
 	// Reduce damage based on you current armor integrity
 	if( InDamage > 0 && ArmorInt > 0 && DamageType.default.bArmorStops )
@@ -564,6 +583,9 @@ simulated event ReplicatedEvent(name VarName)
 	case 'ArmorInt':
 		NotifyArmorChanged();
 		break;
+	case 'QuantumShieldOwner':
+		UpdateQuantumShieldFX();
+		break;
 	default:
 		Super.ReplicatedEvent(VarName);
 	}
@@ -683,6 +705,7 @@ simulated function NotifyArmorChanged()
 {
 	local ExtPerkManager PM;
 	local Ext_PerkSWAT SwatPerk;
+	local ExtPlayerController EPC;
 
 	UpdateGroundSpeed();
 
@@ -693,6 +716,15 @@ simulated function NotifyArmorChanged()
 		if (SwatPerk != None)
 		{
 			SwatPerk.UpdateFoFMods(self);
+		}
+	}
+
+	if (bOwnsQuantumShield && ArmorInt <= 0)
+	{
+		EPC = ExtPlayerController(Controller);
+		if (EPC != None)
+		{
+			EPC.OnQuantumShieldDstroyed();
 		}
 	}
 }
@@ -1876,12 +1908,108 @@ function ThrowActiveWeapon(optional bool bDestroyWeap)
 	}
 }
 
+simulated function UpdateQuantumShieldFX()
+{
+	local vector ColorVec, CoreColorVec;
+
+	if (QuantumShieldOwner != None)
+	{
+		if (QuantumShieldPSC == None)
+		{
+			// QuantumShieldPSC = WorldInfo.MyEmitterPool.SpawnEmitterMeshAttachment(QuantumShieldFX, Mesh, 'Spine2', true);
+			QuantumShieldPSC = WorldInfo.MyEmitterPool.SpawnEmitter(QuantumShieldFX, Location + vect(0,0,-20), Rotation, self);
+			if (QuantumShieldPSC != None)
+			{
+				QuantumShieldPSC.SetAbsolute(false, true, true);
+				QuantumShieldPSC.SetScale(0.5f);
+				QuantumShieldPSC.SetOwnerNoSee(false);
+
+				if (Mesh != None)
+				{
+					Mesh.bOverrideAttachmentOwnerVisibility = false;
+				}
+				
+				// Setup cyan/blue colors for the quantum shield so it renders
+				ColorVec.X = 0.2f;
+				ColorVec.Y = 0.8f;
+				ColorVec.Z = 1.0f;
+				
+				CoreColorVec.X = 0.0f;
+				CoreColorVec.Y = 0.5f;
+				CoreColorVec.Z = 1.0f;
+
+				QuantumShieldPSC.SetVectorParameter('Shield_Color', ColorVec);
+				QuantumShieldPSC.SetVectorParameter('Shield_CoreColor', CoreColorVec);
+			}
+		}
+	}
+	else
+	{
+		if (QuantumShieldPSC != None)
+		{
+			QuantumShieldPSC.DeactivateSystem();
+			QuantumShieldPSC = None;
+		}
+
+		if (Mesh != None)
+		{
+			Mesh.bOverrideAttachmentOwnerVisibility = true;
+		}
+	}
+}
+
+simulated function ReceiveQuantumShield(ExtHumanPawn OwnerPawn, float Duration, int Mult)
+{
+	if (QuantumShieldOwner != None)
+	{
+		DeactivateQuantumShield();
+	}
+
+	QuantumShieldOwner = OwnerPawn;
+	QuantumShieldMultiplier = Mult;
+	bForceNetUpdate = true;
+
+	if (WorldInfo.NetMode != NM_DedicatedServer)
+	{
+		UpdateQuantumShieldFX();
+	}
+}
+
+// used as a recipient
+function DeactivateQuantumShield()
+{
+	QuantumShieldOwner = None;
+	QuantumShieldMultiplier = 0;
+	bForceNetUpdate = true;
+
+	if (WorldInfo.NetMode != NM_DedicatedServer)
+	{
+		UpdateQuantumShieldFX();
+	}
+}
+
+function QuantumShieldAbsorb(out int InDamage)
+{
+	local int AbsorbedDmg;
+
+	if (QuantumShieldOwner == None || QuantumShieldOwner.ArmorInt <= 0)
+		return;
+
+	AbsorbedDmg = Min(InDamage, QuantumShieldOwner.ArmorInt);
+	QuantumShieldOwner.ArmorInt -= AbsorbedDmg;
+	QuantumShieldOwner.QuantumShieldArmorConsumed += AbsorbedDmg;
+	InDamage -= AbsorbedDmg;
+
+	QuantumShieldOwner.NotifyArmorChanged();
+}
+
 defaultproperties
 {
 	HealthRegenRate=0.2
 	ArmorInt=0
 	MaxArmorInt=100
 	ArmorEfficiency=0.2
+	QuantumShieldFX=ParticleSystem'ZED_Matriarch_EMIT.FX_Matriarch_Shield'
 
 	AbilityCount=0
 	AbilityGauge=0

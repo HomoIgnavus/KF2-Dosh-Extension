@@ -26,6 +26,7 @@ enum SpecialAbilities
 	SpAbil_MysticEyes,
 	SpAbil_MGRs,
 	SpAbil_HemoStrike,
+	SpAbil_QuantumShield,
 	SpAbil_None,
 };
 
@@ -51,17 +52,12 @@ static function AddAbility(ExtHumanPawn Player, SpecialAbilities Ability)
 	EPC = ExtPlayerController(Player.Controller);
 	if (EPC != None)
 	{	
-		`log("Ext_TraitSA_Base.AddAbility: BEFORE Add - Ability param = " @ Ability @ ", Array length = " @ EPC.SpecialAbil.Length);
 		
 		if (EPC.SpecialAbil.Find(Ability) == INDEX_NONE)
 		{
 			EPC.SpecialAbil.AddItem(Ability);
 			EPC.ClientAddSpecialAbility(Ability);
 		}
-		
-		`log("Ext_TraitSA_Base.AddAbility: AFTER Add - Array length = " @ EPC.SpecialAbil.Length);
-		for (idx = 0; idx < EPC.SpecialAbil.Length; idx++)
-			`log("Ext_TraitSA_Base.AddAbility:   AFTER [" @ idx @ "] = " @ EPC.SpecialAbil[idx]);
 	}
 	else
 	{

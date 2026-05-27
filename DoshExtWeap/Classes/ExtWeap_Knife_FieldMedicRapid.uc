@@ -86,7 +86,6 @@ simulated function AttemptHemoExplosion(vector ExpLocation)
 // overridden to apply rapid surgery speed boost
 simulated function ModifyMeleeAttackSpeed(out float InSpeed, optional int FireMode = DEFAULT_FIREMODE, optional int UpgradeIndex = INDEX_NONE, optional KFPerk CurrentPerk)
 {
-	InSpeed = GetUpgradedStatValue(InSpeed, EWeaponUpgradeStat(EWUS_MeleeSpeed0 + UpgradeFireModes[FireMode]), CurrentWeaponUpgradeIndex);
 	InSpeed *= RapidSurgerySpeedMod;
 
 	if (CurrentPerk == none)

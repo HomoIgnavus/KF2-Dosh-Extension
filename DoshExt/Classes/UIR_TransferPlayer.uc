@@ -60,7 +60,6 @@ function SetTargetPRI(KFPlayerReplicationInfo PRI)
 
 function Timer()
 {
-	local KFPlayerReplicationInfo MyPRI;
 	local int MyScore;
 
 	if (TargetPRI == None || GetPlayer() == None || GetPlayer().PlayerReplicationInfo == None)
