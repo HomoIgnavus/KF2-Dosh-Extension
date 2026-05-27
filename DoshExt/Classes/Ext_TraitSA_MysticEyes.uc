@@ -83,8 +83,8 @@ defaultproperties
 	NumLevels=3
 
 	DefLevelCosts(0)=100
-	DefLevelCosts(0)=200
-	DefLevelCosts(0)=400
+	DefLevelCosts(1)=200
+	DefLevelCosts(2)=400
 
 	Duration[0]=10
 	Duration[1]=20

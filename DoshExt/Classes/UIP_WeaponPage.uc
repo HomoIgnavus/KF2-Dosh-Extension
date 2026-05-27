@@ -261,8 +261,6 @@ function ShowMenu()
     PopulatePerkDropdown();
     
     class'Ext_WeaponProperties'.static.SetMaxLvs(KFPRI);
-    class'Ext_WeaponProp_GrenadeLauncher'.static.SetMaxLvs(KFPRI);
-    class'Ext_WeaponProp_HuskCannon'.static.SetMaxLvs(KFPRI);
 
     SetTimer(2.0, true);
     Timer();
@@ -308,8 +306,6 @@ function Timer()
     if (KFPRI != None && KFPRI.FCurrentPerk != None)
     {
         class'Ext_WeaponProperties'.static.SetMaxLvs(KFPRI);
-        class'Ext_WeaponProp_GrenadeLauncher'.static.SetMaxLvs(KFPRI);
-        class'Ext_WeaponProp_HuskCannon'.static.SetMaxLvs(KFPRI);
     }
 
     P = LocalPC.Pawn;
@@ -542,16 +538,16 @@ private function UpdateStatRows(Ext_WeaponProperties WPP)
         {
             switch (StatRows[i].StatType)
             {
-            case 0:
+            case DamageUp:
                 StatRows[i].SetStatInfo("Damage:" @ WPP.GetUpgradeInfo(DamageUp), WPP.NextDmgCost, WPP.CanAddDamage());
                 break;
-            case 1:
+            case AoEUp:
                 StatRows[i].SetStatInfo("AoE:" @ WPP.GetUpgradeInfo(AoEUp), WPP.NextAoECost, WPP.CanAddAoE());
                 break;
-            case 2:
+            case PenetrationUp:
                 StatRows[i].SetStatInfo("Penetration:" @ WPP.GetUpgradeInfo(PenetrationUp), WPP.NextPenetrationCost, WPP.CanAddPenetration());
                 break;
-            case 3:
+            case DoTUp:
                 StatRows[i].SetStatInfo("DoT:" @ WPP.GetUpgradeInfo(DoTUp), WPP.NextDoTCost, WPP.CanAddDot());
                 break;
             }
@@ -564,6 +560,7 @@ private function UpdateStatRows(Ext_WeaponProperties WPP)
 
     // Get upgradable stats and create rows dynamically
     Upgradables = WPP.GetUpgradables();
+    // `log("WeaponPage: Upgradables.Length=" @ Upgradables.Length);
     
     for (i = 0; i < Upgradables.Length; i++)
     {
@@ -575,19 +572,19 @@ private function UpdateStatRows(Ext_WeaponProperties WPP)
         switch (UT)
         {
             case DamageUp:
-                StatRow.StatType = 0;
+                StatRow.StatType = UT;
                 StatRow.SetStatInfo("Damage:" @ WPP.GetUpgradeInfo(DamageUp), WPP.NextDmgCost, WPP.CanAddDamage());
                 break;
             case AoEUp:
-                StatRow.StatType = 1;
+                StatRow.StatType = UT;
                 StatRow.SetStatInfo("AoE:" @ WPP.GetUpgradeInfo(AoEUp), WPP.NextAoECost, WPP.CanAddAoE());
                 break;
             case PenetrationUp:
-                StatRow.StatType = 2;
+                StatRow.StatType = UT;
                 StatRow.SetStatInfo("Penetration:" @ WPP.GetUpgradeInfo(PenetrationUp), WPP.NextPenetrationCost, WPP.CanAddPenetration());
                 break;
             case DoTUp:
-                StatRow.StatType = 3;
+                StatRow.StatType = UT;
                 StatRow.SetStatInfo("DoT:" @ WPP.GetUpgradeInfo(DoTUp), WPP.NextDoTCost, WPP.CanAddDot());
                 break;
         }
@@ -614,16 +611,16 @@ private function bool StatRowsMatch(Ext_WeaponProperties WPP)
         switch (UT)
         {
             case DamageUp:
-                AvailableUpgrades.AddItem(0);
+                AvailableUpgrades.AddItem(UT);
                 break;
             case AoEUp:
-                AvailableUpgrades.AddItem(1);
+                AvailableUpgrades.AddItem(UT);
                 break;
             case PenetrationUp:
-                AvailableUpgrades.AddItem(2);
+                AvailableUpgrades.AddItem(UT);
                 break;
             case DoTUp:
-                AvailableUpgrades.AddItem(3);
+                AvailableUpgrades.AddItem(UT);
                 break;
         }
     }

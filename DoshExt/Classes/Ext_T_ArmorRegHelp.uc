@@ -29,7 +29,7 @@ function Timer()
 	else if (PawnOwner.ArmorInt < PawnOwner.MaxArmorInt)
 	{
 		`log("Ext_T_ArmorRegHelp.Timer() RegCount=" @ RegCount @ ", PawnOwner.ArmorInt=" @ PawnOwner.ArmorInt);
-		PawnOwner.ArmorInt = Min(PawnOwner.ArmorInt + RegCount, PawnOwner.MaxArmorInt);
+		PawnOwner.AddArmor(RegCount);
 	}
 }
 

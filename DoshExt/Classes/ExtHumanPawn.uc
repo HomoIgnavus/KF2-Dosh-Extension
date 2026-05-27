@@ -31,7 +31,7 @@ var name FeignRecoverAnim;
 var byte UnfeignFailedCount,RepRegenHP,BHopAccelSpeed;
 var repnotify bool bFeigningDeath;
 var bool bPlayingFeignDeathRecovery,bRagdollFromFalling,bRagdollFromBackhit,bRagdollFromMomentum,bCanBecomeRagdoll,bRedeadMode,bPendingRedead,bHasBunnyHop,bOnFirstPerson,bFPLegsAttached,bFPLegsInit,bThrowAllWeaponsOnDeath;
-var int ArmorInt;
+var repnotify int ArmorInt;
 var int MaxArmorInt;
 
 var byte HealingShieldMod,HealingSpeedBoostMod,HealingDamageBoostMod;
@@ -46,7 +46,7 @@ var public float ArmorEfficiency;
 var public float AirBagRate; // for berserker's Ext_TraitAirbagArmor
 
 // special abilities
-var private bool bIsUsingAbility;
+// var private bool bIsUsingAbility;
 var public int AbilityGauge;
 var public int AbilityCount;
 var public int MaxAbilityCount;
@@ -57,6 +57,7 @@ var public int MGRs_DamageMod;
 var public int MGRs_BasePenetration;
 var public int MGRs_PenetrationMod;
 var public int MGRs_CurrentAmmo;
+
 
 replication
 {
@@ -76,9 +77,8 @@ simulated event PreBeginPlay()
 }
 
 /***
-Below are armor related functions overriden to make use int instead of byte, so that the armor value can get higher than 255
+Below are armor related functions overriden to use int instead of byte, so that the armor value can get higher than 255
  */
-
 function TakeDamage(int Damage, Controller InstigatedBy, vector HitLocation, vector Momentum, class<DamageType> DamageType, optional TraceHitInfo HitInfo, optional Actor DamageCauser)
 {
 	if (KnockbackResist<1)
@@ -90,11 +90,13 @@ function TakeDamage(int Damage, Controller InstigatedBy, vector HitLocation, vec
 function AddArmor( int Amount )
 {
 	ArmorInt = Min( ArmorInt + Amount, GetMaxArmor() );
+	NotifyArmorChanged();
 }
 
 function GiveMaxArmor()
 {
 	ArmorInt = GetMaxArmor();
+	NotifyArmorChanged();
 }
 
 function int GetMaxArmor()
@@ -105,37 +107,14 @@ function int GetMaxArmor()
 
 function ShieldAbsorb( out int InDamage )
 {
-	local float AbsorbedPct;
 	local int AbsorbedDmg;
-	local KFPerk MyPerk;
 
-	MyPerk = GetPerk();
-	if( MyPerk != none && MyPerk.HasHeavyArmor() )
-	{
-		AbsorbedDmg = Min(InDamage, ArmorInt);
-		ArmorInt -= MyPerk.GetArmorDamageAmount( AbsorbedDmg );
-		InDamage -= AbsorbedDmg;
-		return;
-	}
-
-	// Three levels of armor integrity
-	if( ArmorInt >= IntegrityLevel_High )
-	{
-		AbsorbedPct = ArmorAbsorbModifier_High;
-	}
-	else if( ArmorInt >= IntegrityLevel_Medium )
-	{
-		AbsorbedPct = ArmorAbsorbModifier_Medium;
-	}
-	else
-	{
-		AbsorbedPct = ArmorAbsorbModifier_Low;
-	}
-
-	AbsorbedDmg = Min(Round(AbsorbedPct * InDamage), ArmorInt);
+	AbsorbedDmg = Min(Round(ArmorEfficiency * InDamage), ArmorInt);
+	`log("ExtHumanPawn.ShieldAbsorb() ArmorEfficiency = " @ ArmorEfficiency @ " InDamage = " @ InDamage @ " AbsorbedDmg = " @ AbsorbedDmg);
 	// reduce damage and armor
 	ArmorInt -= AbsorbedDmg;
 	InDamage -= AbsorbedDmg;
+	NotifyArmorChanged();
 }
 
 function AdjustDamage(out int InDamage, out vector Momentum, Controller InstigatedBy, vector HitLocation, class<DamageType> DamageType, TraceHitInfo HitInfo, Actor DamageCauser)
@@ -582,6 +561,9 @@ simulated event ReplicatedEvent(name VarName)
 	case 'BackpackWeaponClass':
 		SetBackpackWeapon(BackpackWeaponClass);
 		break;
+	case 'ArmorInt':
+		NotifyArmorChanged();
+		break;
 	default:
 		Super.ReplicatedEvent(VarName);
 	}
@@ -694,6 +676,24 @@ function UpdateGroundSpeed()
 	{
 		GetPerk().ModifySpeed(GroundSpeed);
 		GetPerk().ModifySpeed(SprintSpeed);
+	}
+}
+
+simulated function NotifyArmorChanged()
+{
+	local ExtPerkManager PM;
+	local Ext_PerkSWAT SwatPerk;
+
+	UpdateGroundSpeed();
+
+	PM = ExtPerkManager(GetPerk());
+	if (PM != None)
+	{
+		SwatPerk = Ext_PerkSWAT(PM.CurrentPerk);
+		if (SwatPerk != None)
+		{
+			SwatPerk.UpdateFoFMods(self);
+		}
 	}
 }
 
@@ -1094,6 +1094,7 @@ function AddDefaultInventory()
 	if (EPC != none)
 	{
 		EPC.ServerRecreateWeaponProperties();
+		// ability counts
 	}
 	else
 	{
@@ -1385,6 +1386,7 @@ function AbsorbFallingDamage(out int ActualDamage, out int AbsorbedDamage)
 	AbsorbedDamage = Min(Round(float(ActualDamage) * AirBagRate), ArmorInt);
 	ArmorInt -= AbsorbedDamage;
 	ActualDamage -= AbsorbedDamage;
+	NotifyArmorChanged();
 }
 
 function TakeFallingDamage()
@@ -1423,6 +1425,7 @@ function TakeFallingDamage()
 					FallDmg = -100 * (EffectiveSpeed + MaxFallSpeed) / MaxFallSpeed;
 					// `log("TakeFallingDamage(): FallDmg before = " @ FallDmg);
 					FallDmg *= ZerkerPerk.FallDamageScale;
+					`log("TakeFallingDamage(): FallDmg = " @ FallDmg);
 
 					AbsorbFallingDamage(FallDmg, AbsorbedDamage);
 
@@ -1740,26 +1743,26 @@ reliable client function ClientAbilityUpdated(int NewGauge, int NewCount)
 	// `log("ClientAbilityUpdated(): AbilityGauge: " @ AbilityGauge @ " AbilityCount: " @ AbilityCount @ " MaxAbilityCount: " @ MaxAbilityCount);
 }
 
-function SetAbilityDuration(float duration)
-{
-	OnAbilityStart();
-	ClearTimer(nameOf(OnAbilityEnd));
-	SetTimer(Duration, false, nameOf(OnAbilityEnd));
-}
+// function SetAbilityDuration(float duration)
+// {
+// 	OnAbilityStart();
+// 	ClearTimer(nameOf(OnAbilityEnd));
+// 	SetTimer(Duration, false, nameOf(OnAbilityEnd));
+// }
 
-function OnAbilityStart()
-{
-	bIsUsingAbility = true;
-}
+// function OnAbilityStart()
+// {
+// 	bIsUsingAbility = true;
+// }
 
-function OnAbilityEnd()
-{
-	bIsUsingAbility = false;
-}
+// function OnAbilityEnd()
+// {
+// 	bIsUsingAbility = false;
+// }
 
 function AddAbilityGauge(int AP)
 {
-	if (bIsUsingAbility) return;
+	// if (bIsUsingAbility) return;
 
 	AbilityGauge += AP;
 
@@ -1878,6 +1881,7 @@ defaultproperties
 	HealthRegenRate=0.2
 	ArmorInt=0
 	MaxArmorInt=100
+	ArmorEfficiency=0.2
 
 	AbilityCount=0
 	AbilityGauge=0

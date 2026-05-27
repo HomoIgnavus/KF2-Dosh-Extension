@@ -2,11 +2,11 @@ class ExtWeapDef_Knife_Base extends KFWeapDef_Knife_Medic
 	abstract
 	hidedropdown;
 
-var localized string ItemName;
+var localized string WeaponName;
 
 static function string GetItemName()
 {
-	return default.ItemName;
+	return default.WeaponName;
 }
 
 DefaultProperties

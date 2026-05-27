@@ -21,6 +21,7 @@ Class Ext_TraitSA_Gauge extends Ext_TraitBase;
 
 var int GuagePerKill[3];
 var int MaxCount[3];
+var int InitialCount[3];
 
 static function ApplyEffectOn(ExtHumanPawn Player, Ext_PerkBase Perk, byte Level, optional Ext_TraitDataStore Data)
 {
@@ -32,6 +33,10 @@ static function ApplyEffectOn(ExtHumanPawn Player, Ext_PerkBase Perk, byte Level
 	if (EPC == None) return;
 
 	EPC.AbilityGaugePerKill = default.GuagePerKill[Level - 1];
+	if (Player.AbilityCount == 0)
+	{
+		Player.AbilityCount = default.InitialCount[Level - 1];
+	}
 	EPC.EHP.MaxAbilityCount = default.MaxCount[Level - 1];
 }
 static function CancelEffectOn(ExtHumanPawn Player, Ext_PerkBase Perk, byte Level, optional Ext_TraitDataStore Data)
@@ -59,9 +64,13 @@ defaultproperties
 
 	GuagePerKill(0)=1
 	GuagePerKill(1)=2
-	GuagePerKill(2)=5
+	GuagePerKill(2)=3
 
 	MaxCount(0)=3
 	MaxCount(1)=5
 	MaxCount(2)=9
+
+	InitialCount(0)=0
+	InitialCount(1)=1
+	InitialCount(2)=2
 }

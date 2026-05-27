@@ -23,16 +23,17 @@ var ExtPlayerReplicationInfo ExtPRI;
 
 var public class<KFWeaponDefinition> WeaponDef;
 var public class<KFWeapon> WeaponClass;
+var public array< class<KFProj_BallisticExplosive> > ExpProjs;
 var public string Remark;
 var public KFWeapon WeaponInstance;
 var public int DamageLv;
 var public array<float> BaseDamage;
 var public int AoELv;
-var public float BaseAoE;
+var public array<float> BaseAoE;
 var public int DoTLv;
 var public float BaseDoT;
 var public int PenetrationLv;
-var public array<float> BasePenetration;
+var public array<float> BasePenetrations;
 var public int ListedPrice;
 
 var public bool bCanUpgradeDamage;
@@ -108,6 +109,7 @@ public function PCInit(ExtPlayerController PCParam, KFWeapon WeaponParam)
 
 public function DefInit(class<KFWeaponDefinition> WeaponDefParam, string RemarkParam)
 {
+    local int Idx;
     WeaponDef = WeaponDefParam;
     Remark = RemarkParam;
 
@@ -130,8 +132,7 @@ public function DefInit(class<KFWeaponDefinition> WeaponDefParam, string RemarkP
     DamageLv=0;
     BaseDamage=WeaponClass.default.InstantHitDamage;
     PenetrationLv=0;
-    BasePenetration=WeaponClass.default.PenetrationPower;
-    // SetMaxLvs();
+    BasePenetrations=WeaponClass.default.PenetrationPower;
 
     ListedPrice=WeaponDefParam.Default.BuyPrice;
 
@@ -140,15 +141,24 @@ public function DefInit(class<KFWeaponDefinition> WeaponDefParam, string RemarkP
     else
         bCanUpgradeDamage = false;
 
-    if (WeaponClass.default.PenetrationPower[0] > 0)
-        bCanUpgradePenetration = true;
-    else
-        bCanUpgradePenetration = false;
+    bCanUpgradePenetration = false;
+    for (Idx = 0; Idx < BasePenetrations.Length; Idx++)
+    {
+        BasePenetrations[Idx] = WeaponClass.default.PenetrationPower[Idx];
+        if (BasePenetrations[Idx] > 0)
+            bCanUpgradePenetration = true;
+    }
 
-    if (ClassIsChildOf(WeaponClass, class'KFWeap_GrenadeLauncher_Base'))
-        bCanUpgradeAoE = true;
-    else
-        bCanUpgradeAoE = false;
+    bCanUpgradeAoE = false;
+    for (Idx = 0; Idx < WeaponClass.default.WeaponProjectiles.Length; Idx++)
+    {
+        ExpProjs[Idx] = Class<KFProj_BallisticExplosive>(WeaponClass.default.WeaponProjectiles[Idx]);
+        if (ExpProjs[Idx] != none)
+        {
+            bCanUpgradeAoE = true;
+            BaseAoE[Idx] = ExpProjs[Idx].default.ExplosionTemplate.DamageRadius;
+        }
+    }
 
     if (ClassIsChildOf(WeaponClass, class'KFWeap_FlameBase'))
         bCanUpgradeDot = true;
@@ -238,6 +248,7 @@ public function ApplyModifiers()
 {
     local int Idx;
     local float DmgMod;
+    local class<KFProj_BallisticExplosive> ExpProj;
 
     if (WeaponInstance == none) 
     {
@@ -258,7 +269,19 @@ public function ApplyModifiers()
     {
         for (Idx = 0; Idx < WeaponInstance.PenetrationPower.Length; Idx++)
         {
-            WeaponInstance.PenetrationPower[Idx] = BasePenetration[idx] * (1.0 + default.PenetrationPerLv * PenetrationLv);
+            WeaponInstance.PenetrationPower[Idx] = BasePenetrations[idx] * (1.0 + default.PenetrationPerLv * PenetrationLv);
+        }
+    }
+
+    if (AoELv > 0)
+    {
+        for (Idx = 0; Idx < ExpProjs.Length; idx++)
+        {
+            ExpProj = ExpProjs[Idx];
+            if (ExpProj != none)
+            {
+                ExpProj.default.ExplosionTemplate.DamageRadius = BaseAoE[Idx] * (1.0 + default.AoEPerLv * AoELv);
+            }
         }
     }
 
@@ -334,18 +357,20 @@ public function int AddPenetration()
 public function int AddAoE()
 {
     local int AmountCharged;
+    `log("AddAoE() executed");
     if (!CanAddAoE())
         return 0;
 
     AmountCharged = NextAoECost;
-    AoELv += 1.0;
+    AoELv++;
     TotalValue += NextAoECost;
 
-    if (AoELv < MaxAoELv)
+    if (AoELv < default.MaxAoELv)
         NextAoECost = Round(BasePrice * AoECost * (1 + AoELv));
     else
         NextAoECost = 0;
 
+    `log("AddAoE() lv=" $ AoELv);
     return AmountCharged;
 }
 
@@ -357,10 +382,10 @@ public function int AddDot()
         return 0;
 
     AmountCharged = NextDoTCost;
-    DoTLv += 1.0;
+    DoTLv++;
     TotalValue += NextDoTCost;
 
-    if (DoTLv < MaxDoTLv)
+    if (DoTLv < default.MaxDotLv)
         NextDoTCost = Round(BasePrice * DoTCost * (1 + DoTLv));
     else
         NextDoTCost = 0;
@@ -395,6 +420,8 @@ public function int GetCostPenetration()
 public function Array<UpgradeTypes> GetUpgradables()
 {
     local Array<UpgradeTypes> upgradables;
+    
+    upgradables.Length = 0;
 
     if (bCanUpgradeDamage)
         upgradables.AddItem(UpgradeTypes.DamageUp);
@@ -423,6 +450,7 @@ public function string GetUpgradeInfo(UpgradeTypes Type)
             break;
             
         case AoEUp:
+            `log("GetUpgradeInfo(): AoELv="$AoELv);
             if (AoELv == 0) return "(Lv 0/" @ default.MaxAoELv @ ")";
             return "(Lv" $ AoELv @ "/" @ default.MaxAoELv @ "+" $ Round(AoEPerLv * AoELv * 100) $ "%)";
             break;
@@ -433,8 +461,8 @@ public function string GetUpgradeInfo(UpgradeTypes Type)
             break;
             
         case PenetrationUp:
-            if (BasePenetration.Length == 0) return "0 (Lv 0)";
-            Modified = BasePenetration[0] * (1.0 + PenetrationPerLv * PenetrationLv);
+            if (BasePenetrations.Length == 0) return "0 (Lv 0)";
+            Modified = BasePenetrations[0] * (1.0 + PenetrationPerLv * PenetrationLv);
             // if (PenetrationLv == 0) return Round(Modified) @ "(Lv 0/" @ default.MaxPenetrationLv @ ")";
             return Round(Modified) @ "(Lv" $ PenetrationLv @ "/" @ default.MaxPenetrationLv @ "+" $ Round(PenetrationPerLv * PenetrationLv * 100) $ "%)";
             break;
@@ -474,4 +502,13 @@ defaultproperties
     AoELv=0
     DoTLv = 0
     bCanBeSold = true
+    
+    BasePenetrations.Add(0)
+    BasePenetrations.Add(0)
+
+    BaseAoE.Add(0)
+    BaseAoE.Add(0)
+
+    ExpProjs.Add(none)
+    ExpProjs.Add(none)
 }

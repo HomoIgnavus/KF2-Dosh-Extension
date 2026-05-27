@@ -22,11 +22,57 @@ var byte RepTacticalMove;
 var float MoveSpeedMods[3];
 var bool bRapidAssault;
 
+var bool bHasFoF;
+var float FoFDmgMod;
+var float FoFSpeedMod;
+var float FoFDmgStep;
+var float FoFSpeedStep;
+
 replication
 {
 	// Things the server should send to the client.
 	if (true)
 		RepTacticalMove, bRapidAssault;
+}
+
+simulated function ModifyDamageGiven(out int InDamage, optional Actor DamageCauser, optional KFPawn_Monster MyKFPM, optional KFPlayerController DamageInstigator, optional class<KFDamageType> DamageType, optional int HitZoneIdx)
+{
+	if (bHasFoF)
+	{
+		InDamage *= FoFDmgMod;
+	}
+	super.ModifyDamageGiven(InDamage,DamageCauser,MyKFPM,DamageInstigator,DamageType,HitZoneIdx);
+}
+
+simulated function ModifySpeed(out float Speed)
+{
+	super.ModifySpeed(Speed);
+
+	if (bHasFoF && PlayerOwner != None)
+	{
+		Speed *= FoFSpeedMod;
+	}
+}
+
+simulated function UpdateFoFMods(optional ExtHumanPawn EHP)
+{
+	local float ArmorPct;
+
+	if (bHasFoF)
+	{
+		if (EHP == None && PlayerOwner != None)
+		{
+			EHP = ExtHumanPawn(PlayerOwner.Pawn);
+		}
+
+		if (EHP != None && EHP.MaxArmorInt > 0)
+		{
+			ArmorPct = float(EHP.ArmorInt) / float(EHP.MaxArmorInt);
+			FoFDmgMod = 1.f + FoFDmgStep * ArmorPct;
+			FoFSpeedMod = 1.f + FoFSpeedStep * (1.f - ArmorPct);
+			return;
+		}
+	}
 }
 
 simulated function float GetIronSightSpeedModifier(KFWeapon KFW)
@@ -60,7 +106,7 @@ defaultproperties
 {
 	PerkIcon=Texture2D'UI_PerkIcons_TEX.UI_PerkIcon_SWAT'
 	DefTraitList.Add(class'Ext_TraitWPSWAT')
-	DefTraitList.Add(class'Ext_TraitHeavyArmor')
+	DefTraitList.Add(class'Ext_TraitFightOrFlight')
 	DefTraitList.Add(class'Ext_TraitTacticalMove')
 	DefTraitList.Add(class'Ext_TraitSWATEnforcer')
 	DefTraitList.Add(class'Ext_TraitRapidAssault')
@@ -79,4 +125,9 @@ defaultproperties
 	MoveSpeedMods(0)=1.3
 	MoveSpeedMods(1)=1.5
 	MoveSpeedMods(2)=2
+
+	FoFDmgMod = 1.f
+	FoFSpeedMod = 1.f
+	FoFDmgStep = 0.f
+	FoFSpeedStep = 0.f
 }

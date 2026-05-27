@@ -140,17 +140,6 @@ event Possess(Pawn aPawn, bool bVehicleTransition)
 		PawnClass = class'Pawn';
 	
 	`log("ExtPlayerController.Possess: Role=" @ Role @ " aPawn=" @ aPawn @ " aPawn.Class=" @ string(PawnClass));
-	if (EHP == None)
-	{	
-		`log("ExtPlayerController: EHP is none!");
-	}
-	else
-	{
-        `log("ExtPlayerController: EHP set successfully: " @ EHP);
-		
-	}
-	// ServerRecreateUpgradeStates();
-	// ClientRecreateWeaponProperties();
 }
 
 event UnPossess()
@@ -276,7 +265,7 @@ reliable client function ClientRecreateWeaponProperties()
 			KFW = KFWeapon(Inv);
 			if (KFW != None && KFW.Class == WUS.WeaponClass)
 			{
-				WPP = new class'Ext_WeaponProperties';
+					WPP = new class'Ext_WeaponProperties';
 				WPP.PCInit(self, KFW);
 				WPP.SyncUpgradeState(WUS);
 				InvProperties.AddItem(WPP);
@@ -675,6 +664,7 @@ reliable client event ReceiveLocalizedMessage(class<LocalMessage> Message, optio
 
 function AddZedKill(class<KFPawn_Monster> MonsterClass, byte Difficulty, class<DamageType> DT, bool bKiller)
 {
+	local int multiplyer;
 	// Stats.
 	if (ActivePerkManager!=None)
 	{
@@ -684,7 +674,20 @@ function AddZedKill(class<KFPawn_Monster> MonsterClass, byte Difficulty, class<D
 
 	if (EHP != None)
 	{
-		EHP.AddAbilityGauge(AbilityGaugePerKill);
+		if (MonsterClass.static.IsABoss() || ClassIsChildOf(MonsterClass, class'KFPawn_MonsterBoss'))
+		{
+			multiplyer = 20;
+		}
+		else if (MonsterClass.static.IsLargeZed())
+		{
+			multiplyer = 5;
+		}
+		else
+		{
+			multiplyer = 1;
+		}
+
+		EHP.AddAbilityGauge(AbilityGaugePerKill * multiplyer);
 	}
 }
 
@@ -1368,10 +1371,11 @@ function UseAbility()
 {
 	if (AbilDelegate == none)
 	{
-		AbilDelegate = SA_Grenade;
+		return;
 	}
-
-	ActivePerkManager.CurrentPerk.PerkConsumeAbilityPoints(AbilDelegate());
+	EHP = ExtHumanPawn(Pawn);
+	if (ConsumeAbilityPoints())
+		AbilDelegate();
 }
 
 function SetSpAbil(SpecialAbilities SpAbil)
@@ -1380,7 +1384,6 @@ function SetSpAbil(SpecialAbilities SpAbil)
 	switch (SpAbil)
 	{
 		case SpAbil_PerkGrenade:
-			AbilDelegate = SA_Grenade;
 			break;
 		case SpAbil_RocketJump:
 			AbilDelegate = SA_RocketJump;
@@ -1399,6 +1402,11 @@ function SetSpAbil(SpecialAbilities SpAbil)
 	}
 }
 
+reliable server function ServerConsumeAbilityPoints(int Amount = 1)
+{
+	ActivePerkManager.CurrentPerk.PerkConsumeAbilityPoints(Amount);
+}
+
 function bool ConsumeAbilityPoints(int Amount = 1)
 {
 	EHP = ExtHumanPawn(Pawn);
@@ -1408,14 +1416,9 @@ function bool ConsumeAbilityPoints(int Amount = 1)
 		return false;
 	
 	EHP.AbilityCount -= Amount;
-	ActivePerkManager.CurrentPerk.PerkConsumeAbilityPoints(Amount);
+	ServerConsumeAbilityPoints(Amount);
+	
 	return true;
-}
-
-function int SA_Grenade()
-{
-	Super.StartFire(4);
-	return 0;
 }
 
 /********************
@@ -1488,7 +1491,7 @@ function int SA_MysticEyes()
 		{
 			mysticKnife.ActivateMysticEyes(
 				BerserkerPerk.MysticEyesDuration, BerserkerPerk.MysticEyesDmgMultiplier);
-			EHP.SetAbilityDuration(BerserkerPerk.MysticEyesDuration);
+			// EHP.SetAbilityDuration(BerserkerPerk.MysticEyesDuration);
 			return 1;
 		}
 	}
@@ -1589,7 +1592,6 @@ reliable server function Timer_FireHemoStrikeMissles()
 	else
 	{
 		bIsFiringHemoStrike = false;
-		EHP.OnAbilityEnd();
 	}
 }
 
@@ -1603,7 +1605,6 @@ reliable server function int LaunchHemoStrike()
 
 	PrepareHemoStrike();
 	SetTimer(0.1, false, 'Timer_FireHemoStrikeMissles');
-	EHP.OnAbilityStart();
 	`log("LaunchHemoStrike: firing HemoStrike");
 	bIsFiringHemoStrike = true;
 	return 1;
@@ -1644,9 +1645,9 @@ exec function StartFire(optional byte FireModeNum)
 	else if (FireModeNum==4)
 	{
 		
-		if (Pawn != None)
+		if (Pawn != None && CurrentSpecialAbility != SpAbil_PerkGrenade)
 		{	
-			AbilDelegate();
+			UseAbility();
 			return;
 		}
 	}
@@ -2106,7 +2107,6 @@ simulated function SetWeaponMaxLevels()
 	if (PlayerReplicationInfo != None)
 	{
 		class'Ext_WeaponProperties'.static.SetMaxLvs(PlayerReplicationInfo);
-		class'Ext_WeaponProp_HuskCannon'.static.SetMaxLvs(PlayerReplicationInfo);
 		`log("ExtPlayerController.SetWeaponMaxLevels called");
 	}
 }
@@ -2153,14 +2153,7 @@ function CreateWeapProp(KFWeapon NewWeapon)
 	local int idx;
 	local Ext_WeaponProperties WPP;
 
-	if (ClassIsChildOf(NewWeapon.class, class'KFWeap_HuskCannon'))
-	{
-		WPP = new class'Ext_WeaponProp_HuskCannon';
-	}
-	else
-	{
-		WPP = new class'Ext_WeaponProperties';
-	}
+	WPP = new class'Ext_WeaponProperties';
 
 	WPP.PCInit(self, NewWeapon);
 	InvProperties.AddItem(WPP);

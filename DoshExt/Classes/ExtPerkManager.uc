@@ -118,13 +118,16 @@ function ApplyPawnStats()
 	HP.DefaultInventory = HP.Default.DefaultInventory;
 	HP.HealthMax = HP.default.Health;
 	HP.MaxArmorInt = HP.default.MaxArmorInt;
+	HP.ArmorEfficiency = HP.default.ArmorEfficiency;
 
 	ModifyHealth(HP.HealthMax);
 	ModifyArmorInt(HP.MaxArmorInt);
+	ModifyArmorEfficiency(HP.ArmorEfficiency);
 	CurrentPerk.UpdateAmmoStatus(HP.InvManager);
 
 	if (HP.Health > HP.HealthMax) HP.Health = HP.HealthMax;
 	if (HP.ArmorInt > HP.MaxArmorInt) HP.ArmorInt = HP.MaxArmorInt;
+	HP.NotifyArmorChanged();
 }
 
 
@@ -519,7 +522,10 @@ function bool CanEarnSmallRadiusKillXP(class<DamageType> DT)
 simulated function ModifySpeed(out float Speed)
 {
 	if (CurrentPerk!=None)
+	{
 		Speed *= CurrentPerk.Modifiers[ExtStat_Speed];
+		CurrentPerk.ModifySpeed(Speed);
+	}
 }
 
 function ModifyDamageGiven(out int InDamage, optional Actor DamageCauser, optional KFPawn_Monster MyKFPM, optional KFPlayerController DamageInstigator, optional class<KFDamageType> DamageType, optional int HitZoneIdx)
@@ -587,6 +593,12 @@ function ModifyArmorInt(out int MaxArmorInt)
 		CurrentPerk.ModifyArmor(MaxArmorInt);
 	
 	`Log("ExtPerkManager.ModifyArmorInt() MaxArmorInt=" @ MaxArmorInt);
+}
+
+function ModifyArmorEfficiency(out float ArmorEfficiency)
+{
+	if (CurrentPerk!=None)
+		CurrentPerk.ModifyArmorEfficiency(ArmorEfficiency);
 }
 
 function float GetKnockdownPowerModifier(optional class<DamageType> DamageType, optional byte BodyPart, optional bool bIsSprinting=false)
@@ -787,7 +799,7 @@ simulated function float GetZedTimeExtensions(byte Level)
 // SWAT:
 simulated function bool HasHeavyArmor()
 {
-	return (CurrentPerk!=None && CurrentPerk.bHeavyArmor);
+	return false;
 }
 
 simulated function float GetIronSightSpeedModifier(KFWeapon KFW)

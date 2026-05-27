@@ -136,7 +136,6 @@ defaultproperties
 	PerkIcon=Texture2D'UI_PerkIcons_TEX.UI_PerkIcon_Survivalist'
 	DefTraitList.Add(class'Ext_TraitWPSurv')
 	DefTraitList.Add(class'Ext_TraitScavenger')
-	//DefTraitList.Add(class'Ext_TraitHeavyArmor')
 	BasePerk=class'KFPerk_Survivalist'
 
 	PrimaryMelee=class'KFWeap_Random'

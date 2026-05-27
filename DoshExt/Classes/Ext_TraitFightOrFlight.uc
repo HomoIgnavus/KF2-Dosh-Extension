@@ -16,16 +16,35 @@
 // You should have received a copy of the GNU General Public License along
 // with Server Extension. If not, see <https://www.gnu.org/licenses/>.
 
-Class Ext_TraitHeavyArmor extends Ext_TraitBase;
+Class Ext_TraitFightOrFlight extends Ext_TraitBase;
+
+var float DamageBonusRate[3];
+var float SpeedBonusRate[3];
 
 static function TraitActivate(Ext_PerkBase Perk, byte Level, optional Ext_TraitDataStore Data)
 {
-	Perk.bHeavyArmor = true;
+	local Ext_PerkSWAT SwatPerk;
+
+	SwatPerk = Ext_PerkSWAT(Perk);
+	if (SwatPerk == none) return;
+
+	SwatPerk.bHasFoF = true;
+	SwatPerk.FoFDmgStep = default.DamageBonusRate[Level-1];
+	SwatPerk.FoFSpeedStep = default.SpeedBonusRate[Level-1];
+	SwatPerk.UpdateFoFMods(ExtHumanPawn(SwatPerk.PlayerOwner.Pawn));
 }
 
 static function TraitDeActivate(Ext_PerkBase Perk, byte Level, optional Ext_TraitDataStore Data)
 {
-	Perk.bHeavyArmor = false;
+	local Ext_PerkSWAT SwatPerk;
+
+	SwatPerk = Ext_PerkSWAT(Perk);
+	if (SwatPerk == none) return;
+
+	SwatPerk.bHasFoF = false;
+	SwatPerk.FoFDmgStep = 0.f;
+	SwatPerk.FoFSpeedStep = 0.f;
+	SwatPerk.UpdateFoFMods(ExtHumanPawn(SwatPerk.PlayerOwner.Pawn));
 }
 
 static function ApplyEffectOn(ExtHumanPawn Player, Ext_PerkBase Perk, byte Level, optional Ext_TraitDataStore Data)
@@ -40,7 +59,15 @@ defaultproperties
 {
 	NumLevels=3
 	DefLevelCosts(0)=50
-	DefLevelCosts(1)=20
-	DefLevelCosts(2)=60
+	DefLevelCosts(1)=100
+	DefLevelCosts(2)=200
 	DefMinLevel=50
+
+	DamageBonusRate(0)=0.2
+	DamageBonusRate(1)=0.5
+	DamageBonusRate(2)=1.0
+
+	SpeedBonusRate(0)=0.2
+	SpeedBonusRate(1)=0.5
+	SpeedBonusRate(2)=1.0
 }
