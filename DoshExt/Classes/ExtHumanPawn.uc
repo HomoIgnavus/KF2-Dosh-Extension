@@ -69,12 +69,19 @@ var ParticleSystem QuantumShieldFX;
 // for quantum shield recipients
 var repnotify ExtHumanPawn QuantumShieldOwner;
 
+// for dense rounds
+var bool bIsUsingDenseRounds;
+var float DenseRoundDuration;
+var float DenseRounds_DamageMod;
+var float DenseRounds_PenetrationMod;
+var ExtWeap_DenseRounds DenseRoundsWeapon;
+
 replication
 {
 	if (true)
 		bFeigningDeath,RepRegenHP,BackpackWeaponClass,ArmorInt,MaxArmorInt,bIsUsingMGRs,AbilityGauge,AbilityCount,MaxAbilityCount,QuantumShieldOwner,QuantumShieldDuration,QuantumShieldDmgMultiplier;
 	if (bNetOwner)
-		bHasBunnyHop;
+		bHasBunnyHop, DenseRoundsWeapon;
 	if (bNetDirty)
 		HealingSpeedBoostMod, HealingDamageBoostMod, HealingShieldMod;
 }
@@ -99,20 +106,25 @@ function TakeDamage(int Damage, Controller InstigatedBy, vector HitLocation, vec
 
 function AddArmor( int Amount )
 {
-	ArmorInt = Min( ArmorInt + Amount, GetMaxArmor() );
+	ArmorInt = Min( ArmorInt + Amount, MaxArmorInt);
 	NotifyArmorChanged();
 }
 
 function GiveMaxArmor()
 {
-	ArmorInt = GetMaxArmor();
+	ArmorInt = MaxArmorInt;
+	NotifyArmorChanged();
+}
+
+function OverloadArmor()
+{
+	ArmorInt += MaxArmorInt;
 	NotifyArmorChanged();
 }
 
 function int GetMaxArmor()
 {
-	// `log("ExtHumanPawn.GetMaxArmor() MaxArmorInt = " @ MaxArmorInt);
-	return MaxArmorInt; //Perk might adjust that later
+	return MaxArmorInt;
 }
 
 function ShieldAbsorb( out int InDamage )
@@ -313,7 +325,7 @@ function ReflectProj(Projectile Proj)
 	ReflectDir = Proj.Instigator.Location - Proj.Location;
 	Proj.Destroy();
 
-	RefProj = Spawn(Proj.class, self, , self.Location, rotator(ReflectDir),, true);
+	RefProj = Spawn(Proj.class, Weapon, , self.Location, rotator(ReflectDir),, true);
 	if (RefProj != None)
 	{
 		// Initialize the projectile with proper direction
@@ -1820,12 +1832,12 @@ function AddAbilityGauge(int AP)
 
 simulated function StartFire(byte FireModeNum)
 {
-    // 2 is the RELOAD_FIREMODE. 
-    // If we are already using MGRs and a reload is triggered, we reset it.
-    if (FireModeNum == 2 && bIsUsingMGRs)
-    {
-        ResetMGRs();
-    }
+	if (bIsUsingDenseRounds && FireModeNum == 0)
+	{
+		FireDenseRound();
+		// return;
+	}
+
     Super.StartFire(FireModeNum);
 }
 
@@ -1930,9 +1942,9 @@ simulated function UpdateQuantumShieldFX()
 				}
 				
 				// Setup cyan/blue colors for the quantum shield so it renders
-				ColorVec.X = 0.2f;
-				ColorVec.Y = 0.8f;
-				ColorVec.Z = 1.0f;
+				ColorVec.X = 0.4196f;
+				ColorVec.Y = 1.0f;
+				ColorVec.Z = 0.2941f;
 				
 				CoreColorVec.X = 0.0f;
 				CoreColorVec.Y = 0.5f;
@@ -2003,6 +2015,154 @@ function QuantumShieldAbsorb(out int InDamage)
 	QuantumShieldOwner.NotifyArmorChanged();
 }
 
+simulated function ApplyTraitDenseRounds(float InDuration, float InDamageMod, float InPenetrationMod)
+{
+	if (Role == ROLE_AUTHORITY)
+	{
+		ClientApplyTraitDenseRounds(InDuration, InDamageMod, InPenetrationMod);
+		if (DenseRoundsWeapon == None)
+		{
+			DenseRoundsWeapon = Spawn(class'ExtWeap_DenseRounds', self);
+		}
+	}
+
+	DenseRoundDuration = InDuration;
+	DenseRounds_DamageMod = InDamageMod;
+	DenseRounds_PenetrationMod = InPenetrationMod;
+}
+
+reliable client function ClientApplyTraitDenseRounds(float InDuration, float InDamageMod, float InPenetrationMod)
+{
+	ApplyTraitDenseRounds(InDuration, InDamageMod, InPenetrationMod);
+}
+
+reliable server function ServerActivateDenseRounds()
+{
+	SetUsingDenseRounds(true);
+
+	if (DenseRoundsWeapon == None)
+	{
+		DenseRoundsWeapon = Spawn(class'ExtWeap_DenseRounds', self);
+		DenseRoundsWeapon.Instigator = self;
+	}
+
+	SetTimer(DenseRoundDuration, false, nameOf(ServerDeActivateDenseRounds));
+	ClientActivateDenseRounds();
+}
+
+unreliable server function ServerDeActivateDenseRounds()
+{
+	SetUsingDenseRounds(false);
+}
+
+unreliable client function ClientActivateDenseRounds()
+{
+	SetUsingDenseRounds(true);
+	SetTimer(DenseRoundDuration, false, nameOf(ClientDeActivateDenseRounds));
+}
+
+unreliable client function ClientDeActivateDenseRounds()
+{
+	SetUsingDenseRounds(false);
+}
+
+simulated function SetUsingDenseRounds(bool Activate = true)
+{
+	`log("SetDenseRounds(" @ Activate @ ") called!");
+	bIsUsingDenseRounds = Activate;
+}
+
+
+reliable server function ServerFireDenseRound()
+{
+	FireDenseRound();
+}
+
+simulated function FireDenseRound()
+{
+	local KFWeapon KFW;
+	local float DRDmg;
+	local float DRPnt;
+	local float AmmoMod;
+	local Class<KFProjectile> ProjClass;
+	local KFProjectile DenseBullet;
+	local vector RealStartLoc, AimDir, StartTrace;
+
+
+	if (Role < ROLE_Authority)
+	{
+		ServerFireDenseRound();
+	}
+
+	KFW = KFWeapon(Weapon);
+	if (KFW == None) return;
+
+	ProjClass = KFW.GetKFProjectileClass();
+	if (ProjClass == None) return;
+
+	FiringMode = 0;
+
+	if (KFW.AmmoCount[0] <= 0) return;
+
+	AmmoMod = KFW.AmmoCount[0] * KFW.NumPellets[0];
+	DRDmg = KFW.InstantHitDamage[0]  * DenseRounds_DamageMod * AmmoMod;
+	DRPnt = KFW.PenetrationPower[0] * DenseRounds_PenetrationMod * AmmoMod;
+	KFW.AmmoCount[0] = 0;
+
+	`log("FireDenseRound() DRDmg:" @ DRDmg @ " DRPnt:" @ DRPnt);
+
+	// 2. Play the weapon's fire effects (animation, sound, muzzle flash)
+	KFW.PlayFireEffects(0);
+	// Replicate 3P fire effects to other clients from the server
+	if (Role == ROLE_Authority)
+	{
+		KFW.IncrementFlashCount();
+	}
+	// 3. Manually construct and spawn the bullet (Only run on Server, or Client for client-side hit detection)
+	if (Role == ROLE_AUTHORITY || 
+		(ProjClass.default.bUseClientSideHitDetection && ProjClass.default.bNoReplicationToInstigator && IsLocallyControlled()))
+	{
+		// StartTrace = KFW.GetSafeStartTraceLocation();
+		StartTrace = GetWeaponStartTraceLocation();
+		AimDir = Vector(KFW.GetAdjustedAim(StartTrace));
+		
+		if (KFW.UseFixedPhysicalFireLocation)
+		{
+			RealStartLoc = KFW.GetFixedPhysicalFireStartLoc();
+		}
+		else
+		{
+			RealStartLoc = KFW.GetPhysicalFireStartLoc(AimDir);
+		}
+
+		if (DenseRoundsWeapon != None)
+		{
+			DenseRoundsWeapon.Instigator = self;
+			DenseRoundsWeapon.SetDamage(DRDmg);
+			DenseRoundsWeapon.SetPenetration(DRPnt);
+			DenseRoundsWeapon.SetDamageType(KFW.InstantHitDamageTypes[0]);
+
+			DenseBullet = Spawn(ProjClass, DenseRoundsWeapon,, RealStartLoc);
+			if (DenseBullet != None && !DenseBullet.bDeleteMe)
+			{
+				// Apply damage and penetration directly to the projectile instance without altering the weapon
+				DenseBullet.Instigator = self;
+				DenseBullet.Damage = DRDmg;
+				DenseBullet.MyDamageType = KFW.InstantHitDamageTypes[0];
+				DenseBullet.InitialPenetrationPower = DRPnt;
+				DenseBullet.PenetrationPower = DRPnt;
+				
+				// Scale the projectile visual size to 5x larger
+				DenseBullet.SetDrawScale(5.0);
+
+				// Initialize the projectile direction & movement
+				DenseBullet.Init(AimDir);
+			}
+		}
+	}
+}
+
+
 defaultproperties
 {
 	HealthRegenRate=0.2
@@ -2010,6 +2170,9 @@ defaultproperties
 	MaxArmorInt=100
 	ArmorEfficiency=0.2
 	QuantumShieldFX=ParticleSystem'ZED_Matriarch_EMIT.FX_Matriarch_Shield'
+	bIsUsingDenseRounds=false
+	DenseRounds_DamageMod=0.0
+	DenseRounds_PenetrationMod=0.0
 
 	AbilityCount=0
 	AbilityGauge=0

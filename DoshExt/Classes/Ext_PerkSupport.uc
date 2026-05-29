@@ -21,6 +21,8 @@ Class Ext_PerkSupport extends Ext_PerkBase;
 var bool bUseAPShot,bUsePerforate,bCanRepairDoors;
 var float APShotMul;
 
+var bool bHasAmmoSupplyEx;
+
 replication
 {
 	// Things the server should send to the client.
@@ -55,6 +57,44 @@ simulated function bool IsPerforateActive()
 	return bUsePerforate && WorldInfo.TimeDilation < 1.f;
 }
 
+function PerkConsumeAbilityPoints(int Amount)
+{
+	if (bHasAmmoSupplyEx)
+		RefillTeamAmmo();
+}
+
+reliable server function RefillTeamAmmo()
+{
+	local ExtPlayerController TeammatePC;
+	local ExtHumanPawn TeamPawn;
+
+	foreach WorldInfo.AllControllers(class'ExtPlayerController', TeammatePC)
+	{
+		TeamPawn = ExtHumanPawn(TeammatePC.Pawn);
+		if (TeamPawn != None && TeamPawn.IsAliveAndWell() && TeamPawn.GetTeamNum() == 0)
+		{
+			RefillPlayerAmmo(TeamPawn);	
+		}
+	}
+}
+
+function RefillPlayerAmmo(ExtHumanPawn InPawn)
+{
+	local KFWeapon KFW;
+	local Inventory Inv;
+
+	for (Inv = InPawn.InvManager.InventoryChain; Inv != None; Inv = Inv.Inventory)
+	{
+		KFW = KFWeapon(Inv);
+		if (KFW != None && !KFW.bInfiniteAmmo)
+		{
+			KFW.SpareAmmoCount[0] = KFW.SpareAmmoCapacity[0];
+			KFW.SpareAmmoCount[1] = KFW.SpareAmmoCapacity[1];
+			KFW.ClientForceAmmoUpdate(KFW.AmmoCount[0],KFW.SpareAmmoCount[0]);
+		}
+	}
+}
+
 defaultproperties
 {
 	PerkIcon=Texture2D'UI_PerkIcons_TEX.UI_PerkIcon_Support'
@@ -64,6 +104,9 @@ defaultproperties
 	DefTraitList.Add(class'Ext_TraitAPShots')
 	DefTraitList.Add(class'Ext_TraitDoorRepair')
 	DefTraitList.Add(class'Ext_TraitPenetrator')
+	DefTraitList.Add(class'Ext_TraitSA_Gauge')
+	DefTraitList.Add(class'Ext_TraitSA_DenseRounds')
+	DefTraitList.Add(class'Ext_TraitSA_AmmoSupplyEx')
 	BasePerk=class'KFPerk_Support'
 	WeldExpUpNum=80
 

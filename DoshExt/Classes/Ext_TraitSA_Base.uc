@@ -27,6 +27,7 @@ enum SpecialAbilities
 	SpAbil_MGRs,
 	SpAbil_HemoStrike,
 	SpAbil_QuantumShield,
+	SpAbil_DenseRounds,
 	SpAbil_None,
 };
 

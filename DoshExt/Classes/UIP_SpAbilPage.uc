@@ -16,6 +16,7 @@ var localized string AbilName_MGRs;
 var localized string AbilName_HemoStrike;
 var localized string AbilName_MysticEyes;
 var localized string AbilName_QuantumShield;
+var localized string AbilName_DenseRounds;
 var localized string AbilName_Unknown;
 
 function InitMenu()
@@ -156,6 +157,8 @@ function string GetSpecialAbilityName(SpecialAbilities Ability)
             return AbilName_MysticEyes;
         case SpAbil_QuantumShield:
             return AbilName_QuantumShield;
+        case SpAbil_DenseRounds:
+            return AbilName_DenseRounds;
         default:
             return AbilName_Unknown;
     }
@@ -219,6 +222,10 @@ function GetAbilityText(SpecialAbilities Ability, out string AbilName, out strin
         case SpAbil_QuantumShield:
             AbilName = AbilName_QuantumShield;
             Description = class'Ext_TraitSA_QuantumShield'.default.Description;
+            break;
+        case SpAbil_DenseRounds:
+            AbilName = AbilName_DenseRounds;
+            Description = class'Ext_TraitSA_DenseRounds'.default.Description;
             break;
         default:
             AbilName = "No ability selected.";

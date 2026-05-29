@@ -699,6 +699,95 @@ function DrawHUD()
 	}
 }
 
+function DrawCrosshair()
+{
+	local ExtHumanPawn EHP;
+
+	EHP = ExtHumanPawn(PlayerOwner.Pawn);
+	if (EHP != none)
+	{
+		if (EHP.bIsUsingDenseRounds)
+			DrawDenseCrosshair(EHP);
+		else
+			super.DrawCrosshair();
+	}
+
+}
+
+function DrawDenseCrosshair(ExtHumanPawn EHP)
+{
+	local float CrosshairBorder;
+	local KFWeapon KFWP;
+	local bool bMonsterPawn, bDrawCrosshairNoWeapon;
+	local byte CrossHairAlpha;
+	local float WeaponRecoilMod;
+	local KFPerk MyKFPerk;
+	local CanvasUVTri Tri;
+	local array<CanvasUVTri> Tris;
+	local color DrawCol;
+	local float TriOuter2Center;
+	local float TriInner2Center;
+
+	CrosshairBorder = 12;
+	TargetCrossHairMod = 1.0;
+
+	// Only draw the crosshair if we're not in a vehicle and we have a living pawn
+    if ( EHP != none && EHP.Health > 0  )
+	{
+		if (PlayerOwner.ViewTarget != EHP)
+		{
+			return;
+		}
+
+		KFWP = KFWeapon(EHP.Weapon);
+		MyKFPerk = KFPlayerController(PlayerOwner).GetPerk();
+
+		bMonsterPawn = PlayerOwner.GetTeamNum() == 255;
+
+		// If our pawn class uses a crosshair regardless of weapon, draw it
+		bDrawCrosshairNoWeapon = EHP.bNeedsCrosshair;
+
+		// Don't draw the crosshair if our special move won't allow it
+		if( EHP.IsDoingSpecialMove() && !EHP.SpecialMoves[EHP.SpecialMove].CanDrawCrosshair() )
+		{
+			return;
+		}
+
+        // Set the stock crosshair spread and scale it based on screen resolution
+		TriOuter2Center = CrosshairBorder * 0.7f;
+		TriInner2Center = CrosshairBorder * 0.2f;
+
+		DrawCol = MakeColor(251,109,255,200);
+
+		Tri.V0_UV.X = 0; Tri.V0_UV.Y = 0;
+        Tri.V1_UV.X = 0; Tri.V1_UV.Y = 1;
+        Tri.V2_UV.X = 1; Tri.V2_UV.Y = 1;
+
+		// --- Top Left (Pointing Inward) ---
+		Tri.V0_Pos.X = CenterX - TriOuter2Center; Tri.V0_Pos.Y = CenterY - CrosshairBorder;
+		Tri.V1_Pos.X = CenterX - CrosshairBorder; Tri.V1_Pos.Y = CenterY - TriOuter2Center;
+		Tri.V2_Pos.X = CenterX - TriInner2Center; Tri.V2_Pos.Y = CenterY - TriInner2Center;
+		Tris.AddItem(Tri);
+		// --- Top Right (Pointing Inward) ---
+		Tri.V0_Pos.X = CenterX + TriOuter2Center; Tri.V0_Pos.Y = CenterY - CrosshairBorder;
+		Tri.V1_Pos.X = CenterX + TriInner2Center; Tri.V1_Pos.Y = CenterY - TriInner2Center;
+		Tri.V2_Pos.X = CenterX + CrosshairBorder; Tri.V2_Pos.Y = CenterY - TriOuter2Center;
+		Tris.AddItem(Tri);
+		// --- Bottom Right (Pointing Inward) ---
+		Tri.V0_Pos.X = CenterX + TriInner2Center; Tri.V0_Pos.Y = CenterY + TriInner2Center;
+		Tri.V1_Pos.X = CenterX + TriOuter2Center; Tri.V1_Pos.Y = CenterY + CrosshairBorder;
+		Tri.V2_Pos.X = CenterX + CrosshairBorder; Tri.V2_Pos.Y = CenterY + TriOuter2Center;
+		Tris.AddItem(Tri);
+		// --- Bottom Left (Pointing Inward) ---
+		Tri.V0_Pos.X = CenterX - TriInner2Center; Tri.V0_Pos.Y = CenterY + TriInner2Center;
+		Tri.V1_Pos.X = CenterX - CrosshairBorder; Tri.V1_Pos.Y = CenterY + TriOuter2Center;
+		Tri.V2_Pos.X = CenterX - TriOuter2Center; Tri.V2_Pos.Y = CenterY + CrosshairBorder;
+		Tris.AddItem(Tri);
+		// Render all 4 triangles in one native draw call
+		Canvas.DrawTris(Canvas.DefaultTexture, Tris, DrawCol);
+	}
+}
+
 simulated static final function color GetHPColorScale(Pawn P)
 {
 	local color C;

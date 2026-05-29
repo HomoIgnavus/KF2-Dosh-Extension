@@ -1403,6 +1403,9 @@ function SetSpAbil(SpecialAbilities SpAbil)
 		case SpAbil_QuantumShield:
 			AbilDelegate = SA_QuantumShield;
 			break;
+		case SpAbil_DenseRounds:
+			AbilDelegate = SA_DenseRounds;
+			break;
 		default:
 			break;
 	}
@@ -1418,6 +1421,14 @@ function bool ConsumeAbilityPoints(int Amount = 1)
 	EHP = ExtHumanPawn(Pawn);
 	if (EHP == None || EHP.AbilityCount <= 0) return false;
 	
+	// free powers when cheats are enabled
+	if (CheatManager != None)
+	{
+		`log("ConsumeAbilityPoints() Cheats enabled, 0 ability points consumed.");
+		ServerConsumeAbilityPoints(0);
+		return true;
+	}
+	
 	if (EHP.AbilityCount - Amount < 0)
 		return false;
 	
@@ -1426,6 +1437,23 @@ function bool ConsumeAbilityPoints(int Amount = 1)
 	
 	return true;
 }
+
+/********************
+	Support
+ */
+function int SA_DenseRounds()
+{
+	EHP = ExtHumanPawn(Pawn);
+	if (EHP != None)
+	{
+		EHP.ServerActivateDenseRounds();
+	}
+
+	return 1;
+}
+/*
+	Support
+ ********************/
 
 /********************
 	Commando
@@ -1618,7 +1646,7 @@ reliable server function int LaunchHemoStrike()
 
 function int SA_HemoStrike()
 {
-return LaunchHemoStrike();
+	return LaunchHemoStrike();
 }
 
 function int SA_QuantumShield()
@@ -1744,7 +1772,6 @@ exec function StartFire(optional byte FireModeNum)
 		bAltFire = 1;
 	else if (FireModeNum==4)
 	{
-		
 		if (Pawn != None && CurrentSpecialAbility != SpAbil_PerkGrenade)
 		{	
 			UseAbility();
@@ -2203,7 +2230,6 @@ reliable server function ServerSetWeaponMaxLevels()
 
 simulated function SetWeaponMaxLevels()
 {
-	`log("ExtPlayerController.SetWeaponMaxLevels called on " @ Role);
 	if (PlayerReplicationInfo != None)
 	{
 		class'Ext_WeaponProperties'.static.SetMaxLvs(PlayerReplicationInfo);

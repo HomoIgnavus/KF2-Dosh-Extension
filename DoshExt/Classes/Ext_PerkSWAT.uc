@@ -28,6 +28,8 @@ var float FoFSpeedMod;
 var float FoFDmgStep;
 var float FoFSpeedStep;
 
+var bool bHasArmorOverload;
+
 replication
 {
 	// Things the server should send to the client.
@@ -67,9 +69,9 @@ simulated function UpdateFoFMods(optional ExtHumanPawn EHP)
 
 		if (EHP != None && EHP.MaxArmorInt > 0)
 		{
-			ArmorPct = float(EHP.ArmorInt) / float(EHP.MaxArmorInt);
+			ArmorPct = Abs(EHP.ArmorInt - EHP.MaxArmorInt) / float(EHP.MaxArmorInt);
 			FoFDmgMod = 1.f + FoFDmgStep * ArmorPct;
-			FoFSpeedMod = 1.f + FoFSpeedStep * (1.f - ArmorPct);
+			FoFSpeedMod = 1.f + FoFSpeedStep * Abs(1.f - ArmorPct);
 			return;
 		}
 	}
@@ -102,6 +104,20 @@ function float GetStumblePowerModifier( optional KFPawn KFP, optional class<KFDa
 	return Modifiers[ExtStat_KnockDown];
 }
 
+function PerkConsumeAbilityPoints(int Amount)
+{
+	local ExtHumanPawn EHP;
+	
+	if(PlayerOwner != None)
+	{
+		EHP = ExtHumanPawn(PlayerOwner.Pawn);
+		if (EHP != None)
+		{
+			EHP.OverloadArmor();
+		}
+	}
+}
+
 defaultproperties
 {
 	PerkIcon=Texture2D'UI_PerkIcons_TEX.UI_PerkIcon_SWAT'
@@ -130,4 +146,6 @@ defaultproperties
 	FoFSpeedMod = 1.f
 	FoFDmgStep = 0.f
 	FoFSpeedStep = 0.f
+
+	bHasArmorOverload = False;
 }

@@ -284,8 +284,7 @@ public function ApplyModifiers()
             }
         }
     }
-
-    `log("ApplyModifiers: Weapon=" @ WeaponInstance.Class.Name @ " Dmg=" @ WeaponInstance.InstantHitDamage[0] @ " Penetration=" @ WeaponInstance.PenetrationPower[0]);
+    // `log("ApplyModifiers: Weapon=" @ WeaponInstance.Class.Name @ " Dmg=" @ WeaponInstance.InstantHitDamage[0] @ " Penetration=" @ WeaponInstance.PenetrationPower[0]);
 }
 
 public function Bool CanAddDamage()
