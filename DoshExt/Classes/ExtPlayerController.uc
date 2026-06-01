@@ -37,6 +37,7 @@ var localized string ViewingFromOwnCamera;
 
 var UIP_WeaponPage WeaponPage;
 var Ext_WeaponList WeaponList;
+var array<WeaponInfo> WeaponListCache;
 var array<Ext_WeaponProperties> InvProperties;
 
 var array<SpecialAbilities> SpecialAbil;
@@ -573,6 +574,8 @@ simulated function PostBeginPlay()
 			ActivePerkManager.PRIOwner.PerkManager = ActivePerkManager;
 		SetTimer(0.1,true,'CheckPerk');
 	}
+
+	WeaponListCache.Length = 0;
 
 	InitWeaponProperties();
 }
@@ -2476,6 +2479,44 @@ function OpenTraderMenu( optional bool bForce=false )
 	if (InvMng == None) return;
 		
 	InvMng.ThrowMoney();
+}
+
+reliable server function SyncWeaponList()
+{
+	local int Idx;
+
+	for (idx = 0; idx < WeaponList.WeapInfos.Length; idx++)
+	{
+		ClientAddToWeaponList(WeaponList.WeapInfos[idx]);
+	}
+	`log("SyncWeaponList() added " @ WeaponList.WeapInfos.Length @ " weapons.");
+
+	ClientReloadWeaponPage();
+}
+
+reliable client function ClientSyncWeaponList()
+{
+	WeaponListCache.Length = 0;
+	SyncWeaponList();
+	`log("ClientSyncWeaponList() received " @ WeaponListCache.Length @ " weapons.");
+}
+
+reliable client function ClientAddToWeaponList(WeaponInfo inWeapInfo)
+{
+	WeaponListCache.AddItem(inWeapInfo);
+	`log("ClientAddToWeaponList() added " @ inWeapInfo.WeaponDef.Name @ ".");
+}
+
+reliable client function ClientReloadWeaponPage()
+{
+	if (WeaponPage != None)
+    {
+        // Now that the cache is filled, calling this bypasses the Length == 0 check
+        WeaponPage.LoadAvailableWeapons();
+        
+        // Force the menu elements to redraw with the new weapons list
+        WeaponPage.Timer();
+    }
 }
 
 exec function RequestSwitchTeam()

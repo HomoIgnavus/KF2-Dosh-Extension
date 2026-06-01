@@ -1834,8 +1834,9 @@ simulated function StartFire(byte FireModeNum)
 {
 	if (bIsUsingDenseRounds && FireModeNum == 0)
 	{
+		FiringMode = 0;
 		FireDenseRound();
-		// return;
+		return;
 	}
 
     Super.StartFire(FireModeNum);
@@ -2168,7 +2169,7 @@ defaultproperties
 	HealthRegenRate=0.2
 	ArmorInt=0
 	MaxArmorInt=100
-	ArmorEfficiency=0.2
+	ArmorEfficiency=0.4
 	QuantumShieldFX=ParticleSystem'ZED_Matriarch_EMIT.FX_Matriarch_Shield'
 	bIsUsingDenseRounds=false
 	DenseRounds_DamageMod=0.0

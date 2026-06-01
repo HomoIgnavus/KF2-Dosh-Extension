@@ -35,15 +35,23 @@ var array<class<KFPerk> > DropdownPerkList;
 function LoadAvailableWeapons()
 {
     local int i;
+    local array<WeaponInfo> Weaponlist;
     local WeaponInfo WPI;
     local Ext_WeaponProperties WPP;
 
-    if (KFPC.WeaponList == None)
-        return;
-
-    for (i = 0; i < KFPC.WeaponList.WeapInfos.Length; i++)
+    if (KFPC.WeaponListCache.Length == 0)
     {
-        WPI = KFPC.WeaponList.WeapInfos[i];
+        KFPC.ClientSyncWeaponList();
+    }
+    WeaponList = KFPC.WeaponListCache;
+    if (WeaponList.Length == 0)
+    {
+        return;
+    }
+
+    for (i = 0; i < WeaponList.Length; i++)
+    {
+        WPI = WeaponList[i];
         WPP = new class'Ext_WeaponProperties';
         WPP.DefInit(WPI.WeaponDef, WPI.Remark);
         AvailableWeapons.AddItem(WPP);

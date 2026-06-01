@@ -43,6 +43,7 @@ static function CancelEffectOn(ExtHumanPawn Player, Ext_PerkBase Perk, byte Leve
 defaultproperties
 {
 	SupportedPerk=class'Ext_PerkSupport'
+	NumLevels=3
 	
 	Duration(0)=5.0
 	Duration(1)=10.0
