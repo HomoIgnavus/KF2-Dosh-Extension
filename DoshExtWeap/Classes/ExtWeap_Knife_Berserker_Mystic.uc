@@ -35,23 +35,44 @@ unreliable client function SetDefaultMaterial()
 	Mesh.SetMaterial(0, MaterialInstanceConstant'WEP_1P_BerserkerKnife_MAT.Wep_1stP_BerserkerKnife_MIC');
 }
 
-function ActivateMysticEyes(float Duration, float DmgMultiplier)
+function bool ActivateMysticEyes(float Duration, float DmgMultiplier)
 {
 	local int idx;
+	local int MaxAtk[2];
+	local KFWeap_MeleeBase MLW;
+	local Inventory Inv;
+	local KFPawn PlayerPawn;
 
-	if (bIsMysticEyesActive) return;
+	if (bIsMysticEyesActive) return false;
+
+	PlayerPawn = KFPawn(Instigator);
+	if (PlayerPawn == none) return false;
+
+	MaxAtk[0] = 0;
+	MaxAtk[1] = 0;
+	
+	for (Inv = PlayerPawn.InvManager.InventoryChain; Inv != None; Inv = Inv.Inventory)
+	{
+		MLW = KFWeap_MeleeBase(Inv);
+		if (MLW == none) continue;
+
+		if (MLW.InstantHitDamage[0] > MaxAtk[0]) MaxAtk[0] = MLW.InstantHitDamage[0];
+		if (MLW.InstantHitDamage[1] > MaxAtk[1]) MaxAtk[1] = MLW.InstantHitDamage[1];
+	}
 
 	for (idx = 0; idx < InstantHitDamage.Length; idx++)
 	{
 		DamageNormal[idx] = InstantHitDamage[idx];
-		InstantHitDamage[idx] *= DmgMultiplier;
+		InstantHitDamage[idx] = MaxAtk[idx] * DmgMultiplier;
 	}
+	
 	HelperMystic.SetHeadHitOnly(True);
 	bIsMysticEyesActive = true;
 	SetMysticMaterial();
 
 	SetTimer(Duration, false, 'DeactivateMysticEyes');
 	// `log("Mystic Eyes activated!");
+	return true;
 }
 
 function DeactivateMysticEyes()

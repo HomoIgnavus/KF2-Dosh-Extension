@@ -37,7 +37,6 @@ var localized string ViewingFromOwnCamera;
 
 var UIP_WeaponPage WeaponPage;
 var Ext_WeaponList WeaponList;
-var array<WeaponInfo> WeaponListCache;
 var array<Ext_WeaponProperties> InvProperties;
 
 var array<SpecialAbilities> SpecialAbil;
@@ -574,8 +573,6 @@ simulated function PostBeginPlay()
 			ActivePerkManager.PRIOwner.PerkManager = ActivePerkManager;
 		SetTimer(0.1,true,'CheckPerk');
 	}
-
-	WeaponListCache.Length = 0;
 
 	InitWeaponProperties();
 }
@@ -2485,26 +2482,26 @@ reliable server function SyncWeaponList()
 {
 	local int Idx;
 
-	for (idx = 0; idx < WeaponList.WeapInfos.Length; idx++)
+	for (idx = 0; idx < WeaponList.WeapInfosSync.Length; idx++)
 	{
-		ClientAddToWeaponList(WeaponList.WeapInfos[idx]);
+		ClientAddToWeaponList(WeaponList.WeapInfosSync[idx]);
 	}
-	`log("SyncWeaponList() added " @ WeaponList.WeapInfos.Length @ " weapons.");
+	`log("SyncWeaponList() added " @ WeaponList.WeapInfosSync.Length @ " weapons.");
 
 	ClientReloadWeaponPage();
 }
 
 reliable client function ClientSyncWeaponList()
 {
-	WeaponListCache.Length = 0;
+	WeaponList.WeapInfos.Length = 0;
 	SyncWeaponList();
-	`log("ClientSyncWeaponList() received " @ WeaponListCache.Length @ " weapons.");
+	`log("ClientSyncWeaponList() received " @ WeaponList.WeapInfos.Length @ " weapons.");
 }
 
-reliable client function ClientAddToWeaponList(WeaponInfo inWeapInfo)
+reliable client function ClientAddToWeaponList(WeaponInfoSync inWeapInfoSync)
 {
-	WeaponListCache.AddItem(inWeapInfo);
-	`log("ClientAddToWeaponList() added " @ inWeapInfo.WeaponDef.Name @ ".");
+	WeaponList.AddWeapon(inWeapInfoSync);
+	`log("ClientAddToWeaponList() added " @ inWeapInfoSync.WeaponDefPath @ ".");
 }
 
 reliable client function ClientReloadWeaponPage()

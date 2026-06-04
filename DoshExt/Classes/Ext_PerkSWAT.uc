@@ -59,6 +59,7 @@ simulated function ModifySpeed(out float Speed)
 simulated function UpdateFoFMods(optional ExtHumanPawn EHP)
 {
 	local float ArmorPct;
+	local float ArmorSpd;
 
 	if (bHasFoF)
 	{
@@ -69,7 +70,7 @@ simulated function UpdateFoFMods(optional ExtHumanPawn EHP)
 
 		if (EHP != None && EHP.MaxArmorInt > 0)
 		{
-			ArmorPct = Abs(EHP.ArmorInt - EHP.MaxArmorInt) / float(EHP.MaxArmorInt);
+			ArmorPct = float(EHP.ArmorInt) / float(EHP.MaxArmorInt);
 			FoFDmgMod = 1.f + FoFDmgStep * ArmorPct;
 			FoFSpeedMod = 1.f + FoFSpeedStep * Abs(1.f - ArmorPct);
 			return;

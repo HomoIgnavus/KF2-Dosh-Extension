@@ -7,11 +7,18 @@ struct WeaponGroup
     var string Remark;
 };
 
+struct WeaponInfoSync
+{
+    var string WeaponDefPath;
+    var string Remark;
+};
+
 struct WeaponInfo
 {
     var class<KFWeaponDefinition> WeaponDef;
     var class<KFWeapon> WeaponClass;
     var string Remark;
+    var bool bBuyable;
 };
 
 struct ColorInfo
@@ -29,6 +36,37 @@ var config array<ColorInfo> RemarkColor;
 var config array<string> WeapDef;
 
 var public array<WeaponInfo> WeapInfos;
+var public array<WeaponInfoSync> WeapInfosSync;
+
+function AddWeapon(WeaponInfoSync WPIS)
+{
+    local WeaponInfo WPI;
+    local class<KFWeaponDefinition> WPD;
+    local class<KFWeapon> WPC;
+
+    WPI.WeaponDef = class<KFWeaponDefinition>(DynamicLoadObject(WPIS.WeaponDefPath, class'Class'));
+    if (WPI.WeaponDef == none)
+    {
+        `log("Failed to load weapon definition: " $ WPIS.WeaponDefPath);
+        return;
+    }
+
+    WPI.WeaponClass = class<KFWeapon>(DynamicLoadObject(WPI.WeaponDef.Default.WeaponClassPath, class'Class'));
+    if (WPI.WeaponClass == none)
+    {
+        `log("Failed to load weapon class: " $ WPI.WeaponDef.Default.WeaponClassPath);
+        return;
+    }
+
+    if (BuiltInWeapons.Find(WPD) >= 0)
+        WPI.bBuyable = false;
+    else
+        WPI.bBuyable = true;
+
+    WPI.Remark = WPIS.Remark;
+    WeapInfos.AddItem(WPI);
+    `log("Ext_WeaponList: Added weapon: " $ WPIS.WeaponDefPath);
+}
 
 function LoadWeapons()
 {
@@ -37,6 +75,7 @@ function LoadWeapons()
     local class<KFWeapon> WPC;
     local WeaponGroup WPG;
     local WeaponInfo WPI;
+    local WeaponInfoSync WPIS;
     local string Remark;
 
     foreach default.BuiltInWeapons(WPD)
@@ -85,8 +124,28 @@ function LoadWeapons()
         WPI.WeaponClass = WPC;
         WPI.Remark = Remark;
         WeapInfos.AddItem(WPI);
+
+        WPIS.WeaponDefPath = WPDStr;
+        WPIS.Remark = Remark;
+        WeapInfosSync.AddItem(WPIS);
+        
         `log("Ext_WeaponList: Loaded weapon: " $ WPDStr);
     }
+}
+
+// reliable server function ServerSendWeaponGroup(WeaponGroup inGroup)
+// {
+    
+// }
+
+// reliable server function ServerSendWeapon(WeaponInfo inInfo)
+// {
+//     ClientReceiveWeapons();
+// }
+
+reliable client function ClientReceiveWeapon(WeaponInfo inInfo)
+{
+    WeapInfos.AddItem(inInfo);
 }
 
 function bool GetWeaponInfo(class<KFWeapon> WPC, out WeaponInfo WPI)
@@ -129,5 +188,5 @@ function bool IsUpgradable(class<KFWeapon> WPC)
 defaultproperties
 {
     BuiltInWeapons.Add(class'ExtWeapDef_Knife_MedicRapid')
-    BuiltInWeapons.Add(class'ExtWeapDef_Knife_Berserker_Mystic')
+    // BuiltInWeapons.Add(class'ExtWeapDef_Knife_Berserker_Mystic')
 }

@@ -39,11 +39,11 @@ function LoadAvailableWeapons()
     local WeaponInfo WPI;
     local Ext_WeaponProperties WPP;
 
-    if (KFPC.WeaponListCache.Length == 0)
+    if (KFPC.WeaponList.WeapInfos.Length == 0)
     {
         KFPC.ClientSyncWeaponList();
     }
-    WeaponList = KFPC.WeaponListCache;
+    WeaponList = KFPC.WeaponList.WeapInfos;
     if (WeaponList.Length == 0)
     {
         return;
@@ -52,9 +52,12 @@ function LoadAvailableWeapons()
     for (i = 0; i < WeaponList.Length; i++)
     {
         WPI = WeaponList[i];
-        WPP = new class'Ext_WeaponProperties';
-        WPP.DefInit(WPI.WeaponDef, WPI.Remark);
-        AvailableWeapons.AddItem(WPP);
+        if (WPI.bBuyable)
+        {
+            WPP = new class'Ext_WeaponProperties';
+            WPP.DefInit(WPI.WeaponDef, WPI.Remark);
+            AvailableWeapons.AddItem(WPP);
+        }
     }
     `log("LoadAvailableWeapons(): Loaded " @ AvailableWeapons.Length @ " available weapons from WeaponList.");
 }
